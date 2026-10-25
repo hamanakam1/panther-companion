@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { JsonlCursor } from "./jsonl.js";
 import { watch } from "node:fs";
 import type { Observation, IngestOptions } from "../domain.js";
 import { Adapter } from "./adapter.js";
@@ -20,6 +20,7 @@ import { Adapter } from "./adapter.js";
 export class BrowserAdapter extends Adapter {
   readonly id = "browser";
   private readonly logPath: string | null;
+  private readonly cursor = new JsonlCursor();
 
   constructor(logPath?: string | null) {
     super();
@@ -49,25 +50,7 @@ export class BrowserAdapter extends Adapter {
   }
 
   private readFileEvents(): Array<Record<string, unknown>> {
-    try {
-      const text = readFileSync(this.logPath!, "utf8");
-      return this.parseJsonl(text);
-    } catch {
-      return [];
-    }
-  }
-
-  private parseJsonl(text: string): Array<Record<string, unknown>> {
-    const events: Array<Record<string, unknown>> = [];
-    for (const line of text.split(/\r?\n/)) {
-      if (!line.trim()) continue;
-      try {
-        events.push(JSON.parse(line));
-      } catch {
-        // ignore malformed lines
-      }
-    }
-    return events;
+    return this.cursor.read(this.logPath!);
   }
 
   private eventToObservation(

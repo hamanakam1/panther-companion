@@ -51,7 +51,7 @@ export abstract class Adapter {
 
   /** Log-friendly summary of what this adapter can capture right now. */
   status(): string {
-    return `${this.id}: available`;
+    return `${this.id}: ${this.supports() ? "configured" : "not configured"}`;
   }
 }
 

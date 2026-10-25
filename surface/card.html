@@ -1,325 +1,82 @@
 <!doctype html>
 <html lang="en">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Panther Companion — Explain</title>
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'">
+<title>Panther Companion</title>
 <style>
-  * { box-sizing: border-box; }
-  :root {
-    --bg: #0b0c10; --card: #111318; --border: #2a2f3a; --text: #e8eaed;
-    --muted: #94a3b8; --accent: #38bdf8; --ok: #4ade80; --warn: #fbbf24;
-    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; }
-  #root { height: 100%; display: grid; grid-template-rows: 44px 1fr 40px; overflow: hidden; min-height: 0; }
-  .bar { display: flex; align-items: center; gap: 8px; padding: 0 10px; border-bottom: 1px solid var(--border); background: #0f1116; -webkit-app-region: drag; }
-  .bar .brand { font-weight: 700; letter-spacing: 0.4px; font-size: 12px; }
-  .bar .version { color: var(--muted); font-size: 11px; letter-spacing: 0.5px; }
-  .bar .mode { margin-left: auto; display: flex; gap: 6px; }
-  .bar button { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 4px 9px; border-radius: 5px; font-size: 11px; cursor: pointer; -webkit-app-region: no-drag; }
-  .bar button.active { border-color: var(--accent); color: var(--accent); }
-  .bar button:hover { background: #171a24; }
-  main { overflow-y: auto; padding: 14px 16px; display: grid; gap: 10px; min-height: 0; }
-  .goal { background: #0f1116; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
-  .goal .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; }
-  .goal h1 { margin: 0; font-size: 15px; font-weight: 600; }
-  .goal .edit { margin-top: 6px; }
-  .goal input { background: #0b0c10; border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 4px 8px; width: 100%; max-width: 260px; font: inherit; }
-  .goal .hint { color: var(--muted); font-size: 11px; margin-top: 4px; }
-  .empty { color: var(--muted); font-size: 13px; padding: 28px 16px; text-align: center; line-height: 1.6; border: 1px dashed var(--border); border-radius: 8px; background: #0f1116; }
-  .notice { color: var(--ok); font-size: 11px; padding: 0 8px; white-space: nowrap; }
-  .notice.hidden { display: none; }
-  footer { border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: #0f1116; font-size: 11px; color: var(--muted); -webkit-app-region: no-drag; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; display: none; }
-  .card.shown { display: block; }
-  .card .head { display: flex; align-items: baseline; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  .card .head .tag { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--accent); font-weight: 700; }
-  .card .head .using { margin-left: auto; color: var(--muted); font-size: 11px; }
-  .card .head .using b { color: var(--text); }
-  .section { padding: 10px 12px; }
-  .section + .section { border-top: 1px solid #1c202b; }
-  .section .title { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 6px; font-weight: 700; }
-  .section p { margin: 0 0 4px 0; color: var(--text); font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
-  .section p.none { color: var(--muted); font-style: italic; }
-  .evidence { display: grid; gap: 6px; }
-  .evidence .item { background: #0b0c10; border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; font-size: 12px; }
-  .evidence .item .prov { color: var(--accent); font-weight: 700; font-size: 11px; margin-bottom: 2px; }
-  .evidence .item .loc { color: var(--muted); font-size: 11px; margin-top: 3px; }
-  ul { margin: 0; padding-left: 16px; color: var(--text); }
-  li { margin: 2px 0; font-size: 13px; line-height: 1.5; }
-  .gate { padding: 8px 12px; color: var(--muted); font-size: 11.5px; border-top: 1px solid #1c202b; }
-  .gate b { color: var(--text); }
-  footer { border-top: 1px solid var(--border); display: flex; gap: 8px; padding: 7px 12px; background: #0f1116; font-size: 11px; color: var(--muted); -webkit-app-region: no-drag; }
-  footer button { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 4px 9px; cursor: pointer; font-size: 11px; -webkit-app-region: no-drag; }
-  footer button.active { border-color: var(--ok); color: var(--ok); }
-  footer button:hover { background: #171a24; }
-  footer .flex { margin-left: auto; display: flex; gap: 6px; }
-  .badge { display: inline-block; border: 1px solid var(--border); border-radius: 9px; padding: 1px 7px; font-size: 10px; color: var(--muted); margin-right: 6px; }
-  .badge.ok { border-color: var(--ok); color: var(--ok); }
-  .badge.warn { border-color: var(--warn); color: var(--warn); }
-  .hidden { display: none !important; }
+:root{color-scheme:dark;--bg:#11171c;--panel:#1b252b;--line:#34434b;--muted:#a9bac1;--ink:#f1f6f4;--mint:#98e5c0;--amber:#e8c88c;--red:#ffb5ae;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink)}button,input,textarea,select{font:inherit}button{border:1px solid var(--line);border-radius:9px;padding:9px 13px;background:#25323a;color:var(--ink);cursor:pointer;transition:background .15s}button:hover{background:#334750}button:disabled{opacity:.5;cursor:wait}button.primary{background:var(--mint);border-color:var(--mint);color:#10251d;font-weight:650}button.ghost{background:transparent}button.small{padding:5px 9px;font-size:12px}button.danger{color:var(--red)}:focus-visible{outline:3px solid var(--mint);outline-offset:3px}input,textarea,select{color:var(--ink);border:1px solid var(--line);border-radius:8px;background:#111a20;padding:10px 12px;width:100%}textarea{resize:vertical;min-height:100px}input[type=checkbox]{width:auto}h1,h2,h3,p{margin:0}h1{font-size:21px;letter-spacing:-.5px}h2{font-size:18px;letter-spacing:-.3px}h3{font-size:14px}a{color:var(--mint)}header{padding:22px 26px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;background:#151e24}.mark{display:grid;place-items:center;width:37px;height:37px;background:var(--mint);color:#10251d;border-radius:12px;font-size:23px;font-weight:800}.eyebrow{font-size:10px;letter-spacing:1.8px;font-weight:700;text-transform:uppercase;color:var(--muted)}header .spacer{flex:1}.status{display:flex;align-items:center;gap:6px;color:var(--mint);font-size:12px}.dot{width:6px;height:6px;background:currentColor;border-radius:50%}main{max-width:840px;margin:auto;padding:22px 26px 30px;display:grid;gap:18px}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.between{justify-content:space-between}.muted{color:var(--muted);font-size:13px}.panel{border:1px solid var(--line);border-radius:14px;padding:18px;background:var(--panel)}.goal{border-left:3px solid var(--mint)}#goal-text{font-size:19px;line-height:1.4;letter-spacing:-.25px;margin:10px 0 7px;overflow-wrap:anywhere}.stack{display:grid;gap:12px}.modes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.modes button{min-height:65px;text-align:left;padding:10px 12px;font-weight:600}.modes span{display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:3px}.modes button.primary span{color:#245641}.section-label{font-size:11px;text-transform:uppercase;letter-spacing:1.25px;color:var(--muted);margin-bottom:8px}#session-bar{font-size:12px;color:var(--mint);padding:0 2px}.next{padding:17px;border-radius:11px;background:#223c33;border:1px solid #476658;margin:16px 0}.next .section-label{color:#b3e8ca}#next-check{font-size:17px;line-height:1.5}.explanation{display:grid;gap:14px}.explanation p{overflow-wrap:anywhere}.empty{padding:28px 10px;text-align:center}.empty .symbol{font-size:32px;color:var(--mint);margin-bottom:10px}.empty p{max-width:400px;margin:10px auto;color:var(--muted)}details{border-top:1px solid var(--line);padding-top:12px;margin-top:14px}summary{cursor:pointer;font-size:13px;color:var(--muted)}ul{margin:8px 0 12px;padding-left:20px}li{margin:6px 0;overflow-wrap:anywhere}.knowledge{padding:13px 0;border-bottom:1px solid var(--line)}.knowledge:last-child{border:0}.knowledge h3{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mint)}.knowledge.inferred h3{color:var(--amber)}.knowledge.unknown h3{color:var(--muted)}.feedback{margin-top:16px;display:flex;flex-wrap:wrap;gap:6px}.feedback button{font-size:11px;padding:6px 9px}.notice{padding:10px 13px;border:1px solid #476658;background:#223c33;border-radius:9px;font-size:13px;overflow-wrap:anywhere}.notice.error{border-color:#7a4946;background:#392626;color:var(--red)}#notice:empty{display:none}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.evidence-item{padding:12px 0;border-bottom:1px solid var(--line)}.evidence-item:last-child{border:0}.evidence-item p{font-size:13px;overflow-wrap:anywhere;white-space:pre-wrap}.evidence-item .meta{font-size:11px;color:var(--muted);margin-bottom:5px}.footer{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;gap:10px}dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:24px;width:min(550px,calc(100% - 30px));max-height:90vh;overflow:auto}dialog::backdrop{background:#050a0dcc}dialog h2{margin-bottom:16px}label{display:block;font-size:13px}label input,label textarea,label select{margin-top:5px}.checkbox{display:flex;align-items:center;gap:8px}.checkbox input{margin:0}dialog .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}dialog .help{font-size:12px;color:var(--muted);margin-top:4px}.hidden,[hidden]{display:none!important}#evidence-summary{white-space:pre-wrap;max-height:180px;overflow:auto;font-size:13px}#status-text{white-space:nowrap}.chip{font-size:10px;padding:3px 7px;border:1px solid var(--line);border-radius:5px;color:var(--muted)}.error-state{color:var(--red)}@media(max-width:480px){header{padding:16px}main{padding:16px;gap:14px}.modes{grid-template-columns:1fr}.modes button{min-height:45px}.modes span{display:inline;margin-left:6px}#status-text{max-width:80px;white-space:normal}.footer{flex-wrap:wrap}.panel{padding:15px}}@media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
-<div id="root">
-  <div class="bar">
-    <div class="brand">panther</div>
-    <div class="version" id="app-version">v1.0.0</div>
-    <div style="flex:1"></div>
-    <div class="mode">
-      <button id="mode-explain" class="active" onclick="app.setMode('explain')">Explain this</button>
-      <button id="mode-follow" onclick="app.setMode('follow')">Follow this task</button>
-      <button id="mode-prepare" onclick="app.setMode('prepare')">Prepare decision</button>
-    </div>
-  </div>
-  <main>
-    <section class="goal">
-      <div class="label">Current goal</div>
-      <h1 id="goal-text">—</h1>
-      <div class="edit">
-        <input id="goal-input" placeholder="Type a goal hypothesis and press Enter">
-        <div class="hint">Enter to set • <button onclick="app.editGoal()">edit</button> • <button onclick="app.wrongTask()">Wrong task</button></div>
-      </div>
-    </section>
-    <div id="empty" class="empty">Panther is quiet. Capture a terminal command or focused browser tab, then press <b>Explain this</b>.</div>
-    <div id="card" class="card">
-      <div class="head">
-        <span class="tag" id="card-topic">—</span>
-        <span class="using">Using: <b id="card-using">—</b></span>
-      </div>
-      <div class="section">
-        <div class="title">What it means</div>
-        <p id="s-what" class="none">—</p>
-      </div>
-      <div class="section">
-        <div class="title">Why it matters here</div>
-        <p id="s-why" class="none">—</p>
-      </div>
-      <div class="section">
-        <div class="title">Next check</div>
-        <p id="s-next" class="none">—</p>
-      </div>
-      <div class="section">
-        <div class="title">Evidence <span class="badge" id="evidence-count">0</span></div>
-        <div class="evidence" id="evidence-list"></div>
-      </div>
-      <div class="section">
-        <div class="title">Observed / Inferred / Unknown</div>
-        <p><b>Observed:</b> <span id="s-observed" class="none">—</span></p>
-        <p><b>Inferred:</b> <span id="s-inferred" class="none">—</span></p>
-        <p><b>Unknown:</b> <span id="s-unknown" class="none">—</span></p>
-      </div>
-      <div class="gate">
-        <span id="gate-reason">gate: —</span>
-      </div>
-    </div>
-  </main>
-  <footer>
-    <span id="footer-mode">mode: explain</span>
-    <span id="notice" class="notice hidden"></span>
-    <div class="flex">
-      <button onclick="app.feedback('AlreadyKnow')">Already know</button>
-      <button onclick="app.feedback('WrongTask')">Wrong task</button>
-      <button onclick="app.feedback('UsefulMoreLikeThis')">More like this</button>
-      <button onclick="app.feedback('ExplainMechanism')">Explain mechanism</button>
-      <button onclick="app.feedback('UsefulButLater')">Useful but later</button>
-      <button onclick="app.refresh()">Refresh</button>
-    </div>
-  </footer>
-</div>
+</head>
+<body>
+<header><div class="mark" aria-hidden="true">P</div><div><h1>Panther</h1><div class="eyebrow">Companion</div></div><div class="spacer"></div><div class="status"><span class="dot"></span><span id="status-text">Connecting</span></div><button id="pause" class="small ghost" disabled>Pause</button></header>
+<main>
+<div id="notice" role="status" aria-live="polite"></div>
+<section class="panel goal" aria-labelledby="goal-label"><div class="row between"><div class="section-label" id="goal-label">Your current goal</div><button id="edit-goal" class="small ghost">Edit goal</button></div><p id="goal-text">Loading your workspace…</p><p id="goal-context" class="muted">Your goal guides what deserves attention.</p></section>
+<section aria-label="Companion modes" class="stack"><div class="modes"><button id="explain" class="primary" data-work>Explain this<span>Make sense of evidence</span></button><button id="follow" data-work>Follow this task<span>Quiet, bounded updates</span></button><button id="prepare" data-work>Prepare next decision<span>A brief at your pause</span></button></div><div id="session-bar" class="row between" hidden><span id="session-text"></span><button id="stop" class="small ghost">End follow</button></div></section>
+<section class="panel" aria-labelledby="insight-label"><div class="row between"><h2 id="insight-label">What matters now</h2><span id="topic" class="chip">Ready when you are</span></div><div id="empty" class="empty"><div class="symbol" aria-hidden="true">◌</div><h3 id="empty-title">A little context goes a long way.</h3><p id="empty-copy">Set a goal, then attach selected evidence or import an Intent Capture bundle. Companion will help you find the next useful check.</p><button id="empty-attach" class="ghost">Attach evidence</button></div><article id="card" hidden><div class="explanation" style="margin-top:18px"><div><div class="section-label">What it means</div><p id="means"></p></div><div><div class="section-label">Why it matters here</div><p id="why"></p></div></div><div class="next"><div class="section-label">Your next check</div><p id="next-check"></p></div><p id="card-meta" class="muted"></p><details><summary>Observed, inferred, and still unknown</summary><div class="knowledge"><h3>Observed</h3><ul id="observed"></ul></div><div class="knowledge inferred"><h3>Inferred · check before relying on it</h3><ul id="inferred"></ul></div><div class="knowledge unknown"><h3>Unknown</h3><ul id="unknown"></ul></div></details><details><summary id="refs-label">Evidence sources</summary><ul id="refs"></ul></details><div class="feedback" aria-label="Explanation feedback"><button data-feedback="UsefulMoreLikeThis">Useful</button><button data-feedback="AlreadyKnow">Already know</button><button data-feedback="WrongTask">Wrong task</button><button data-feedback="ExplainMechanism">More detail</button><button data-feedback="UsefulButLater">Later</button><button id="dismiss" class="ghost">Dismiss</button></div></article></section>
+<section class="panel"><div class="row between"><h2>Selected context</h2><span id="context-count" class="muted">No evidence yet</span></div><p class="muted" style="margin:8px 0 14px">Attach what you choose. No screen recording or terminal commands run here.</p><div class="toolbar"><button id="attach">＋ Attach evidence</button><button id="import">Import from Intent Capture</button></div><details id="context-details"><summary>Recent evidence</summary><div id="recent"></div></details><details><summary>Sources &amp; local history</summary><ul id="sources"></ul><p class="muted">Follow reads only configured JSONL sources. Closing Companion ends follow; reopening never resumes it automatically.</p><div class="toolbar" style="margin-top:12px"><button id="export" class="small">Export local history</button><button id="delete" class="small danger ghost">Delete local history</button></div></details></section>
+<footer class="footer"><span>Local first · Suggestions stay in your control</span><span id="updated">Not connected</span></footer>
+</main>
+<dialog id="goal-dialog"><form id="goal-form"><h2>What are you working toward?</h2><label>A clear outcome<textarea id="goal-input" maxlength="2000" placeholder="Make the checkout flow reliable and easy to understand"></textarea></label><p class="help">Keep it specific. Changing the goal clears the current explanation and ends any follow session.</p><div class="actions"><button type="button" data-close>Cancel</button><button class="primary" type="submit">Save goal</button></div></form></dialog>
+<dialog id="evidence-dialog"><form id="evidence-form" class="stack"><h2>Attach selected evidence</h2><label>Evidence type<select id="evidence-kind"><option value="note">Note or selected text</option><option value="terminal">Terminal result</option></select></label><div id="terminal-fields" class="stack" hidden><label>Command that already ran<input id="command" maxlength="1000" placeholder="npm test"></label><label>Observed exit code<input id="exit-code" type="number" min="-255" max="255" value="1"></label></div><label id="evidence-text-label">Selected text or output<textarea id="evidence-input" maxlength="12000" required placeholder="Paste only the context you want Companion to use…"></textarea></label><p class="help">This stays in local history. Remove secrets before attaching. Commands are evidence, never executed.</p><div class="actions"><button type="button" data-close>Cancel</button><button class="primary" type="submit">Attach &amp; explain</button></div></form></dialog>
+<dialog id="import-dialog"><h2>Bring a capture into context</h2><p class="muted">Export JSON from Intent Capture's draft review, then choose the bundle here. Only the proposal and its evidence summary are imported.</p><label style="margin:16px 0">Intent bundle JSON<input id="bundle-file" type="file" accept=".json,application/json"></label><div id="import-preview" hidden class="stack"><div class="notice" id="bundle-summary"></div><p id="bundle-goal" class="muted"></p><label class="checkbox"><input id="use-goal" type="checkbox">Use the captured goal as my current goal</label><p class="help">Proposals remain unverified. Import does not create tickets or authorize work.</p></div><div class="actions"><button data-close>Cancel</button><button id="confirm-import" class="primary" disabled>Import &amp; explain</button></div></dialog>
+<dialog id="delete-dialog"><form id="delete-form"><h2>Delete local Companion history?</h2><p class="muted">This removes goals, selected evidence, explanations, and feedback from this Companion store. Export anything you want to keep first.</p><label style="margin-top:16px">Type DELETE to confirm<input id="delete-confirm" autocomplete="off" required pattern="DELETE"></label><div class="actions"><button type="button" data-close>Cancel</button><button class="danger" type="submit">Delete local history</button></div></form></dialog>
 <script>
-const BASE = "";
-let app = null;
-
-// Unified transport: Electron IPC when available, HTTP fetch otherwise.
-const IPC = typeof window !== "undefined" && window.pantherAPI ? window.pantherAPI : null;
-
-async function json(path, opts = {}) {
-  const res = await fetch(path, { headers: { "content-type": "application/json" }, ...opts });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+const $ = id => document.getElementById(id);
+let current = null, busy = false, connected = false, bundle = null, bundleGeneration = 0, noticeTimer;
+async function api(action, data = {}) {
+  if (window.pantherAPI) return window.pantherAPI.action(action, data);
+  const read = action === 'status' || action === 'export';
+  const response = await fetch('/api/' + action, {method: read ? 'GET' : 'POST', headers: read ? {} : {'content-type':'application/json'}, body: read ? undefined : JSON.stringify(data), signal: AbortSignal.timeout(70000)});
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'This action could not finish.');
+  return result;
 }
-
-async function tStatus() {
-  if (IPC) return IPC.status();
-  return json("/api/status");
+function notice(message, error = false) { const dialog=document.querySelector('dialog[open]'); if(dialog && error){let local=dialog.querySelector('[data-error]');if(!local){local=document.createElement('p');local.dataset.error='true';local.className='notice error';local.setAttribute('role','alert');dialog.prepend(local);}local.textContent=message;} clearTimeout(noticeTimer); $('notice').textContent = message; $('notice').className = 'notice' + (error ? ' error' : ''); if (!error) noticeTimer = setTimeout(() => $('notice').textContent = '', 7000); }
+function list(id, items, fallback = 'None in the selected evidence.') { const target = $(id); target.replaceChildren(); for (const item of items?.length ? items : [fallback]) { const li = document.createElement('li'); li.textContent = item; target.append(li); } }
+function formatTime(time) { const date = new Date(time); return Number.isFinite(date.getTime()) ? date.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : 'Unknown time'; }
+function setWorking(value) { busy = value; document.querySelectorAll('[data-work],#confirm-import').forEach(el => el.disabled = value || !connected || !!current?.paused || (el.id === 'confirm-import' && !bundle)); }
+function render(data) {
+  current = data; connected = true;
+  $('status-text').textContent = data.paused ? 'Paused' : data.busy ? 'Thinking' : data.session?.status === 'active' ? 'Following' : 'Ready';
+  $('pause').textContent = data.paused ? 'Resume' : 'Pause'; $('pause').disabled = false;
+  $('goal-text').textContent = data.goal.correctedByUser ? data.goal.hypothesis : 'Give your work a direction.';
+  $('goal-context').textContent = data.goal.needsCorrection ? 'Marked as the wrong task. Edit the goal to continue.' : data.goal.correctedByUser ? 'Your stated goal · Edit it whenever the task changes.' : 'Set the outcome you want. Companion will keep it in view.';
+  const active = data.session?.status === 'active'; $('session-bar').hidden = !active; $('session-text').textContent = active ? `Following until ${formatTime(data.session.endsAt)} · Only configured sources` : '';
+  const live = data.live;
+  $('card').hidden = !live; $('empty').hidden = !!live;
+  if (live) { const e = live.explanation; $('topic').textContent = live.producedBy === 'prepare' ? 'Decision brief' : 'Evidence explained'; $('means').textContent = e.whatItMeans; $('why').textContent = e.whyItMattersHere; $('next-check').textContent = e.nextCheck; $('card-meta').textContent = `Based on selected evidence · ${formatTime(e.createdAt)} · ${e.evidence.length} source${e.evidence.length === 1 ? '' : 's'}`; list('observed', e.observed); list('inferred', e.inferred, 'No inference added.'); list('unknown', e.unknown); list('refs', e.evidence.map(ref => `${ref.label} — ${ref.providerId} · ${ref.locator}`)); $('refs-label').textContent = `Evidence sources (${e.evidence.length})`; }
+  else { $('topic').textContent = data.paused ? 'Paused' : 'Ready when you are'; $('empty-title').textContent = data.paused ? 'Your attention comes first.' : data.lastDecision?.reason === 'routine success' ? 'Nothing here needs an interruption.' : data.goal.correctedByUser ? 'Your goal is set. Bring in the context.' : 'A little context goes a long way.'; $('empty-copy').textContent = data.paused ? 'No sources are being read. Resume when you want a fresh explanation.' : data.lastDecision?.reason === 'routine success' ? 'The captured command succeeded. Keep going, or attach another result when you need help.' : 'Attach selected evidence or import an Intent Capture bundle. Companion will help you find the next useful check.'; }
+  list('sources', data.sources, 'No external sources configured. Manual evidence and Intent Capture imports work independently.');
+  $('context-count').textContent = data.observations.length ? `${data.observations.length} recent item${data.observations.length === 1 ? '' : 's'}` : 'No evidence yet'; $('recent').replaceChildren();
+  if (!data.observations.length) { const p = document.createElement('p'); p.className='muted';p.textContent='Your selected evidence will appear here.'; $('recent').append(p); }
+  for (const observation of [...data.observations].reverse()) { const item = document.createElement('div');item.className='evidence-item'; const meta=document.createElement('div');meta.className='meta';meta.textContent=`${observation.providerId} · ${formatTime(observation.capturedAt)}`;const p=document.createElement('p');p.textContent=observation.summary.slice(0,600);item.append(meta,p);$('recent').append(item); }
+  $('updated').textContent = 'Updated ' + formatTime(new Date()); setWorking(busy);
 }
-async function tExplain() {
-  if (IPC) return IPC.explain();
-  return json("/api/explain", { method: "POST" });
-}
-async function tFollow() {
-  if (IPC) return IPC.follow();
-  return json("/api/follow", { method: "POST" });
-}
-async function tPrepare() {
-  if (IPC) return IPC.prepare();
-  return json("/api/prepare", { method: "POST" });
-}
-async function tSetGoal(hypothesis) {
-  if (IPC) return IPC.setGoal(hypothesis);
-  return json("/api/goal", { method: "POST", body: JSON.stringify({ hypothesis }) });
-}
-async function tFeedback(kind, insightId, topic) {
-  if (IPC) return IPC.feedback(kind, insightId, topic);
-  return json("/api/feedback", { method: "POST", body: JSON.stringify({ kind, insightId, topic }) });
-}
-
-class App {
-  constructor() {
-    this.mode = "explain";
-    this.live = null;
-    this.goal = null;
-    this.refreshInterval = null;
-    this.ipcUnsubscribe = null;
-    this._noticeTimer = null;
-    this.bind();
-    this.refresh();
-    this.refreshInterval = setInterval(() => this.refresh(), 4000);
-    this.setupIPC();
-  }
-  bind() {
-    document.getElementById("goal-input").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") { e.preventDefault(); this.setGoal(); }
-    });
-    // Hide the card on Escape in Electron mode.
-    if (IPC) {
-      document.addEventListener("keydown", (e) => { if (e.key === "Escape") IPC.hide(); });
-    }
-  }
-  setupIPC() {
-    if (!IPC) return;
-    this.ipcUnsubscribe = IPC.onCardUpdate((data) => {
-      this.applyStatus(data);
-    });
-  }
-  async applyStatus(status) {
-    this.goal = status.goal;
-    this.renderGoal();
-    const versionEl = document.getElementById("app-version");
-    if (versionEl) versionEl.textContent = "v" + (status.version ?? "1.0.0");
-    if (status.live) {
-      this.live = status.live;
-      this.renderCard(this.live);
-      document.getElementById("empty").classList.add("hidden");
-      document.getElementById("card").classList.add("shown");
-    } else {
-      this.live = null;
-      document.getElementById("card").classList.remove("shown");
-      const empty = document.getElementById("empty");
-      empty.classList.remove("hidden");
-      const hypothesis = (this.goal && this.goal.hypothesis && this.goal.hypothesis !== "Goal not set")
-        ? this.goal.hypothesis : "";
-      if (hypothesis) {
-        empty.innerHTML = '<b style="color:var(--text)">Goal set.</b> ' + escapeHtml(hypothesis) +
-          '<br><br>Capture a terminal command (or focus a browser tab), then press <b>Explain this</b>.';
-      } else {
-        empty.innerHTML = 'No goal set yet. Type a goal hypothesis above, then capture a command and press <b>Explain this</b>.';
-      }
-    }
-  }
-  async refresh() {
-    try {
-      const status = await tStatus();
-      this.applyStatus(status);
-    } catch (err) {
-      document.getElementById("empty").textContent = "panther not reachable: " + err.message;
-    }
-  }
-  async setMode(m) {
-    this.mode = m;
-    for (const b of document.querySelectorAll(".bar button")) b.classList.remove("active");
-    document.getElementById(`mode-${m}`).classList.add("active");
-    document.getElementById("footer-mode").textContent = "mode: " + m;
-    try {
-      if (m === "explain") await tExplain();
-      else if (m === "follow") await tFollow();
-      else if (m === "prepare") await tPrepare();
-      this.refresh();
-    } catch (err) {
-      document.getElementById("empty").textContent = "panther error: " + err.message;
-    }
-  }
-  async setGoal() {
-    const input = document.getElementById("goal-input");
-    const hypothesis = input.value.trim();
-    if (!hypothesis) return;
-    await tSetGoal(hypothesis);
-    input.value = "";
-    await this.showNotice("Goal set: " + hypothesis);
-    this.refresh();
-  }
-  async editGoal() {
-    const input = document.getElementById("goal-input");
-    input.focus();
-  }
-  async wrongTask() {
-    await tFeedback("WrongTask", this.live ? this.live.insightId : null, this.live ? this.live.explanation.topic : null);
-    await this.showNotice("Recorded: wrong task. Goal marked for correction.");
-    this.refresh();
-  }
-  async feedback(kind) {
-    await tFeedback(kind, this.live ? this.live.insightId : null, this.live ? this.live.explanation.topic : null);
-    await this.showNotice("Feedback recorded (" + kind + ").");
-    this.refresh();
-  }
-  async showNotice(text) {
-    const n = document.getElementById("notice");
-    if (!n) return;
-    n.textContent = text;
-    n.classList.remove("hidden");
-    if (this._noticeTimer) clearTimeout(this._noticeTimer);
-    this._noticeTimer = setTimeout(() => n.classList.add("hidden"), 1600);
-  }
-  renderGoal() {
-    const g = this.goal;
-    const el = document.getElementById("goal-text");
-    const input = document.getElementById("goal-input");
-    if (g && g.hypothesis && g.hypothesis !== "Goal not set") {
-      el.textContent = g.hypothesis;
-      input.placeholder = g.hypothesis;
-    } else {
-      el.textContent = "No goal set";
-      input.placeholder = "Set a goal hypothesis…";
-    }
-  }
-  renderCard(live) {
-    document.getElementById("empty").classList.add("hidden");
-    const card = document.getElementById("card");
-    card.classList.add("shown");
-    const e = live.explanation;
-    document.getElementById("card-topic").textContent = e.topic;
-    document.getElementById("card-using").textContent = (live.using || []).join(", ") || "—";
-    document.getElementById("s-what").textContent = e.whatItMeans || "—";
-    document.getElementById("s-what").className = e.whatItMeans ? "" : "none";
-    document.getElementById("s-why").textContent = e.whyItMattersHere || "—";
-    document.getElementById("s-why").className = e.whyItMattersHere ? "" : "none";
-    document.getElementById("s-next").textContent = e.nextCheck || "—";
-    document.getElementById("s-next").className = e.nextCheck ? "" : "none";
-    document.getElementById("gate-reason").textContent = "gate: " + (live.reasoning || "—");
-    document.getElementById("evidence-count").textContent = String(e.evidence ? e.evidence.length : 0);
-    const list = document.getElementById("evidence-list");
-    list.innerHTML = "";
-    for (const ref of (e.evidence || [])) {
-      const div = document.createElement("div");
-      div.className = "item";
-      div.innerHTML = `<div class="prov">${ref.providerId}</div><div>${ref.label}</div><div class="loc">${ref.locator}</div>`;
-      list.appendChild(div);
-    }
-    const renderList = (id, items) => {
-      const el = document.getElementById(id);
-      if (!items || items.length === 0) { el.textContent = "—"; el.className = "none"; return; }
-      el.className = "";
-      el.innerHTML = items.map((t) => `<li>${escapeHtml(t)}</li>`).join("");
-    };
-    renderList("s-observed", e.observed);
-    renderList("s-inferred", e.inferred);
-    renderList("s-unknown", e.unknown);
-    for (const b of document.querySelectorAll("footer button")) b.classList.remove("active");
-    document.getElementById("footer-mode").textContent = "mode: " + this.mode;
-  }
-}
-function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[c]); }
-
-document.addEventListener("DOMContentLoaded", () => { app = new App(); });
-
+async function refresh() { if (busy) return; try { render(await api('status')); } catch { connected=false; $('status-text').textContent='Offline';$('updated').textContent='Connection unavailable';$('pause').disabled=true;setWorking(false);notice('Companion is not reachable. Start it again; your saved context stays on this computer.',true); } }
+async function perform(action,data={},message='') { setWorking(true);try { const result=await api(action,data);if(result?.goal) render(result);if(message) notice(message);return result; } catch(error){ notice(error.message || 'The action did not finish.',true);throw error; } finally { setWorking(false); } }
+function openDialog(id){ $(id).querySelectorAll('[data-error]').forEach(el=>el.remove()); $(id).showModal(); }
+document.querySelectorAll('[data-close]').forEach(button=>button.onclick=()=>button.closest('dialog').close());
+$('edit-goal').onclick=()=>{ $('goal-input').value=current?.goal.correctedByUser?current.goal.hypothesis:'';openDialog('goal-dialog');$('goal-input').focus(); };
+$('goal-form').onsubmit=async event=>{event.preventDefault();try{await perform('goal',{hypothesis:$('goal-input').value.trim()||null},'Goal saved.');$('goal-dialog').close();}catch{}};
+$('pause').onclick=()=>perform('pause',{paused:!current.paused},current.paused?'Resumed. Start Follow again when you want updates.':'Paused. No new sources will be read.').catch(()=>{});
+for(const mode of ['explain','follow','prepare'])$(mode).onclick=()=>perform(mode).catch(()=>{});
+$('stop').onclick=()=>perform('stop',{},'Follow ended.').catch(()=>{});
+$('attach').onclick=$('empty-attach').onclick=()=>openDialog('evidence-dialog');
+$('evidence-kind').onchange=()=>{$('terminal-fields').hidden=$('evidence-kind').value!=='terminal';$('command').required=$('evidence-kind').value==='terminal';};
+$('evidence-form').onsubmit=async event=>{event.preventDefault();try{await perform('observation',{kind:$('evidence-kind').value,text:$('evidence-input').value,command:$('command').value,exitCode:Number($('exit-code').value)},'Selected evidence attached.');$('evidence-dialog').close();$('evidence-input').value='';}catch{}};
+$('import').onclick=()=>{bundleGeneration++;bundle=null;$('bundle-file').value='';$('import-preview').hidden=true;$('confirm-import').disabled=true;$('use-goal').checked=false;openDialog('import-dialog');};
+$('import-dialog').addEventListener('close',()=>{bundleGeneration++;bundle=null;});
+$('bundle-file').onchange=async()=>{const generation=++bundleGeneration;bundle=null;$('confirm-import').disabled=true;$('import-preview').hidden=true;try{const file=$('bundle-file').files[0];if(!file)return;if(file.size>1024*1024)throw new Error('Choose a JSON bundle smaller than 1 MiB.');const candidate=JSON.parse(await file.text());const preview=await api('import-preview',{bundle:candidate});if(generation!==bundleGeneration||!$('import-dialog').open)return;bundle=candidate;$('bundle-summary').textContent=`${preview.title||'Untitled capture'} · ${preview.count} review proposal${preview.count===1?'':'s'}\n${preview.sourceUrl||'Source URL not supplied'}`;$('bundle-goal').textContent=preview.goal?`Captured goal: ${preview.goal}`:'No goal was supplied in this capture.';$('use-goal').disabled=!preview.goal;$('import-preview').hidden=false;$('confirm-import').disabled=false;}catch(error){if(generation===bundleGeneration&&$('import-dialog').open)notice(error.message||'Choose a valid Intent Capture bundle.',true);}};
+$('confirm-import').onclick=async()=>{try{const result=await perform('import',{bundle,useGoal:$('use-goal').checked});$('import-dialog').close();notice(`${result.imported} review proposal${result.imported===1?'':'s'} imported. No work was authorized.`);bundle=null;}catch{}};
+document.querySelectorAll('[data-feedback]').forEach(button=>button.onclick=async()=>{try{await perform('feedback',{kind:button.dataset.feedback},'Feedback saved locally.');if(button.dataset.feedback==='WrongTask')$('edit-goal').click();if(button.dataset.feedback==='ExplainMechanism')await perform('explain');}catch{}});
+$('dismiss').onclick=()=>perform('dismiss',{},'Explanation dismissed. Selected evidence remains available.').catch(()=>{});
+$('export').onclick=async()=>{try{const data=await api('export');const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='panther-companion.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);notice('Local history exported.');}catch(error){notice(error.message,true);}};
+$('delete').onclick=()=>{$('delete-confirm').value='';openDialog('delete-dialog');};
+$('delete-form').onsubmit=async event=>{event.preventDefault();try{await perform('delete',{confirm:$('delete-confirm').value},'Local Companion history deleted.');$('delete-dialog').close();}catch{}};
+document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();$('edit-goal').click();}});
+void refresh();setInterval(refresh,4000);
 </script>
+</body>
 </html>

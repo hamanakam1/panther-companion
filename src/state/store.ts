@@ -88,12 +88,17 @@ CREATE TABLE IF NOT EXISTS durable_memory (
 CREATE INDEX IF NOT EXISTS idx_obs_sig ON observations(signature);
 CREATE INDEX IF NOT EXISTS idx_insights_group ON insights(group_key, status);
 CREATE INDEX IF NOT EXISTS idx_sig ON insight_signatures(signature);
+CREATE TABLE IF NOT EXISTS observation_goals (observation_id TEXT NOT NULL, goal_id TEXT NOT NULL, PRIMARY KEY (observation_id, goal_id));
+CREATE TABLE IF NOT EXISTS explanation_goals (explanation_id TEXT PRIMARY KEY, goal_id TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS insight_goals (insight_id TEXT PRIMARY KEY, goal_id TEXT NOT NULL);
 `;
 
 export class Store {
+  private transactionActive = false;
   constructor(private readonly db: DatabaseSync) {
     this.db.exec("PRAGMA journal_mode = WAL;");
     this.db.exec("PRAGMA foreign_keys = ON;");
+    this.db.exec("PRAGMA busy_timeout = 5000;");
     this.db.exec(SCHEMA);
   }
 
@@ -119,7 +124,30 @@ export class Store {
   }
 
   saveGoal(goal: Goal): void {
-    this.setMeta("goal", goal);
+    this.transaction(() => { this.invalidate(); this.setMeta("goal", goal); });
+  }
+
+  stateRevision(): string { return this.meta<string>("state_revision") ?? "initial"; }
+  invalidate(): void { this.setMeta("state_revision", randomUUID()); }
+
+  goalState(now: string): { goal: Goal; revision: string } {
+    this.getGoal(now);
+    const row = this.db.prepare("SELECT (SELECT value FROM meta WHERE key = 'goal') AS goal, (SELECT value FROM meta WHERE key = 'state_revision') AS revision").get()!;
+    return { goal: JSON.parse(String(row.goal)) as Goal, revision: row.revision ? JSON.parse(String(row.revision)) as string : "initial" };
+  }
+
+  withStateRevision<T>(revision: string, action: () => T): T | null {
+    return this.transaction(() => this.stateRevision() === revision ? action() : null);
+  }
+
+  transaction<T>(action: () => T): T {
+    if (this.transactionActive) return action();
+    this.db.exec("BEGIN IMMEDIATE");
+    this.transactionActive = true;
+    try {
+      const result = action(); this.db.exec("COMMIT"); return result;
+    } catch (error) { this.db.exec("ROLLBACK"); throw error; }
+    finally { this.transactionActive = false; }
   }
 
   getPreferences(): Preferences {
@@ -127,8 +155,11 @@ export class Store {
   }
 
   savePreferences(prefs: Preferences): void {
-    const known = prefs.knownSignatures.slice(-200);
-    this.setMeta("preferences", { ...prefs, knownSignatures: known });
+    this.transaction(() => {
+      this.invalidate();
+      const known = prefs.knownSignatures.slice(-200);
+      this.setMeta("preferences", { ...prefs, knownSignatures: known });
+    });
   }
 
   getSession(): Session | null {
@@ -136,8 +167,11 @@ export class Store {
   }
 
   saveSession(session: Session | null): void {
-    if (!session) this.db.prepare("DELETE FROM meta WHERE key = ?").run("session");
-    else this.setMeta("session", session);
+    this.transaction(() => {
+      this.invalidate();
+      if (!session) this.db.prepare("DELETE FROM meta WHERE key = ?").run("session");
+      else this.setMeta("session", session);
+    });
   }
 
   getLive(): SurfaceCard | null {
@@ -159,7 +193,7 @@ export class Store {
     return pending;
   }
 
-  insertObservation(obs: Observation): void {
+  insertObservation(obs: Observation, goalId?: string): void {
     this.db.prepare(`
       INSERT OR IGNORE INTO observations
       (id, provider_id, captured_at, label, locator, summary, payload, signature)
@@ -174,6 +208,7 @@ export class Store {
       JSON.stringify(obs.payload),
       obs.signature,
     );
+    this.db.prepare("INSERT OR IGNORE INTO observation_goals (observation_id, goal_id) VALUES (?, ?)").run(obs.id, goalId ?? this.getGoal(obs.capturedAt).id);
   }
 
   getObservations(ids: string[]): Observation[] {
@@ -190,10 +225,15 @@ export class Store {
     });
   }
 
+  latestObservations(limit = 25): Observation[] {
+    const goal = this.meta<Goal>("goal");
+    return this.db.prepare("SELECT observations.* FROM observations JOIN observation_goals ON observation_goals.observation_id = observations.id WHERE observation_goals.goal_id = ? ORDER BY captured_at DESC, observations.rowid DESC LIMIT ?").all(goal?.id ?? "", limit).map(rowToObservation).reverse();
+  }
+
   recentSummaries(limit: number): string[] {
     const rows = this.db.prepare(
-      "SELECT body FROM explanations ORDER BY created_at DESC LIMIT ?",
-    ).all(limit);
+      "SELECT body FROM explanations JOIN explanation_goals ON explanation_goals.explanation_id = explanations.id WHERE explanation_goals.goal_id = ? ORDER BY created_at DESC LIMIT ?",
+    ).all(this.meta<Goal>("goal")?.id ?? "", limit);
     return rows.flatMap((row) => {
       const record = asObject(row);
       if (!record || typeof record.body !== "string") return [];
@@ -208,6 +248,7 @@ export class Store {
       JSON.stringify(explanation),
       explanation.createdAt,
     );
+    this.db.prepare("INSERT OR REPLACE INTO explanation_goals (explanation_id, goal_id) VALUES (?, ?)").run(explanation.id, this.getGoal(explanation.createdAt).id);
   }
 
   getExplanation(id: string): Explanation | null {
@@ -232,6 +273,7 @@ export class Store {
       insight.updatedAt,
     );
     this.replaceSignatures(insight.id, signatures);
+    this.db.prepare("INSERT OR REPLACE INTO insight_goals (insight_id, goal_id) VALUES (?, ?)").run(insight.id, this.getGoal(insight.createdAt).id);
   }
 
   updateInsight(insight: Insight, signatures: string[]): void {
@@ -261,12 +303,14 @@ export class Store {
     const row = this.db.prepare(`
       SELECT insights.* FROM insights
       JOIN insight_signatures ON insight_signatures.insight_id = insights.id
+      JOIN insight_goals ON insight_goals.insight_id = insights.id
       WHERE insight_signatures.signature IN (${marks})
+        AND insight_goals.goal_id = ?
         AND insights.status = 'transient'
         AND insights.expires_at > ?
       ORDER BY insights.updated_at DESC
       LIMIT 1
-    `).get(...signatures, now);
+    `).get(...signatures, this.meta<Goal>("goal")?.id ?? "", now);
     return rowToInsight(asObject(row));
   }
 
@@ -286,6 +330,8 @@ export class Store {
     this.db.prepare(
       "UPDATE insights SET status = 'expired', updated_at = ? WHERE status = 'transient' AND expires_at <= ?",
     ).run(now, now);
+    const live = this.getLive();
+    if (live && this.getInsight(live.insightId)?.status === "expired") this.setLive(null);
   }
 
   expireFailuresForCommand(commandSignature: string, now: string): string[] {
@@ -422,6 +468,8 @@ export class Store {
       session: this.getSession(),
       live: this.getLive(),
       observations: this.db.prepare("SELECT * FROM observations").all(),
+      observationGoals: this.db.prepare("SELECT * FROM observation_goals").all(),
+      insightGoals: this.db.prepare("SELECT * FROM insight_goals").all(),
       explanations: this.db.prepare("SELECT * FROM explanations").all(),
       insights: this.listInsights(),
       questions: this.db.prepare("SELECT * FROM questions").all(),
@@ -432,21 +480,26 @@ export class Store {
   }
 
   deleteAll(now: string): void {
-    for (const table of [
-      "durable_memory",
-      "gate_log",
-      "feedback",
-      "questions",
-      "insight_signatures",
-      "insights",
-      "explanations",
-      "observations",
-      "meta",
-    ]) {
-      this.db.exec(`DELETE FROM ${table}`);
-    }
-    this.saveGoal(unsetGoal(now));
-    this.savePreferences(defaultPreferences());
+    this.transaction(() => {
+      for (const table of [
+        "durable_memory",
+        "gate_log",
+        "feedback",
+        "questions",
+        "insight_signatures",
+        "insights",
+        "explanations",
+        "observations",
+        "observation_goals",
+        "explanation_goals",
+        "insight_goals",
+        "meta",
+      ]) {
+        this.db.exec(`DELETE FROM ${table}`);
+      }
+      this.saveGoal(unsetGoal(now));
+      this.savePreferences(defaultPreferences());
+    });
   }
 
   private replaceSignatures(insightId: string, signatures: string[]): void {

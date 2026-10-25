@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { JsonlCursor } from "./jsonl.js";
 import { createInterface } from "node:readline";
 import { watch } from "node:fs";
 import type { Observation, IngestOptions } from "../domain.js";
@@ -22,6 +22,7 @@ import { Adapter, observationSummary } from "./adapter.js";
 export class TerminalAdapter extends Adapter {
   readonly id = "terminal";
   private readonly logPath: string | null;
+  private readonly cursor = new JsonlCursor();
 
   constructor(logPath?: string | null) {
     super();
@@ -59,27 +60,7 @@ export class TerminalAdapter extends Adapter {
   }
 
   private readNewFileEvents(): Array<Record<string, unknown>> {
-    try {
-      const stat = readFileSync(this.logPath!, "utf8");
-      return this.parseJsonlFromOffset(stat);
-    } catch {
-      return [];
-    }
-  }
-
-  private parseJsonlFromOffset(text: string): Array<Record<string, unknown>> {
-    // Simple approach: re-parse the whole file but track offset via byte length.
-    // For a live tailing use-case, this is adequate for small-to-medium logs.
-    const events: Array<Record<string, unknown>> = [];
-    for (const line of text.split(/\r?\n/)) {
-      if (!line.trim()) continue;
-      try {
-        events.push(JSON.parse(line));
-      } catch {
-        // ignore malformed lines
-      }
-    }
-    return events;
+    return this.cursor.read(this.logPath!);
   }
 
   private async readStdinEvents(): Promise<Array<Record<string, unknown>>> {

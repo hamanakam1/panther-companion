@@ -50,7 +50,9 @@ export class LocalReasoner implements Reasoner {
 }
 
 export function reasonLocally(input: ReasonerInput): ReasonerOutput {
-  if (input.brief) return brief(input);
+  if (input.brief && input.openQuestions.length) return brief(input);
+  const intent = input.observations.find(obs => obs.providerId === "panther-ic");
+  if (intent) return intentExplanation(input, intent);
   if (input.returnToTask && input.openQuestions.length > 0) return returning(input);
   const mismatch = findMismatch(input.observations);
   if (mismatch) return mismatchExplanation(input, mismatch);
@@ -62,6 +64,25 @@ export function reasonLocally(input: ReasonerInput): ReasonerOutput {
   if (isRoutineSuccess(input.observations)) return routine(input);
   if (input.observations.length === 0) return emptyCapture(input);
   return thin(input);
+}
+
+function intentExplanation(input: ReasonerInput, intent: Observation): ReasonerOutput {
+  const payload = asRecord(intent.payload) ?? {};
+  const strings = (key: string) => Array.isArray(payload[key]) ? (payload[key] as unknown[]).filter((item): item is string => typeof item === "string") : [];
+  const evidence = readString(payload, "observedEvidence") ?? "";
+  const hypothesis = readString(payload, "hypothesis");
+  const checks = strings("suggestedChecks");
+  const acceptance = strings("acceptanceCriteria");
+  return {
+    whatItMeans: `A captured workflow has a proposal to review: ${excerpt(intent.label, 220)}`,
+    whyItMattersHere: `${goalSentence(input)} The imported proposal is context for your decision; it has not been verified or scheduled.`,
+    nextCheck: checks[0] ? `Proposed check (not yet performed): ${checks[0]}` : acceptance[0] ? `Verify this proposed acceptance condition: ${acceptance[0]}` : "Compare the captured steps with the behavior you expected, then define one verifiable acceptance condition.",
+    usedObservationIds: [intent.id],
+    observed: [...(evidence ? [`Producer's evidence summary (not independently verified): ${evidence}`] : []), ...strings("observedSteps").map(step => `Producer-reported step (not independently verified): ${step}`)],
+    inferred: hypothesis ? [`Unverified proposal: ${hypothesis}`] : [],
+    unknown: ["Whether the proposed issue reproduces now.", "Whether the suggested change will satisfy the goal.", ...strings("questions")],
+    confidence: 0.6, topic: "captured-intent", decisionNeeded: true, routineSuccess: false,
+  };
 }
 
 type Claim = { observationId: string; locator: string; key: string; value: string };

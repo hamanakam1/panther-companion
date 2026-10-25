@@ -17,6 +17,8 @@ import { groupKeyFor } from "./core/insights.js";
 import { addMinutes } from "./core/text.js";
 import { Reasoner } from "./core/reasoner.js";
 import { Adapter } from "./adapters/adapter.js";
+import { randomUUID } from "node:crypto";
+import { questionTextFor } from "./core/reasoner.js";
 
 const DEFAULT_LIMIT = 25;
 
@@ -70,7 +72,7 @@ export class Panther {
   async follow(options: IngestOptions = {}): Promise<{ session: Session; result: IngestResult }> {
     const now = options.now ?? nowIso();
     const session: Session = {
-      id: `session-${Date.now()}`,
+      id: `session-${randomUUID()}`,
       mode: "follow",
       goalId: this.store.getGoal(now).id,
       startedAt: now,
@@ -86,7 +88,7 @@ export class Panther {
   async prepare(options: IngestOptions = {}): Promise<IngestResult> {
     const now = options.now ?? nowIso();
     const session: Session = {
-      id: `session-${Date.now()}`,
+      id: `session-${randomUUID()}`,
       mode: "prepare",
       goalId: this.store.getGoal(now).id,
       startedAt: now,
@@ -94,31 +96,50 @@ export class Panther {
       status: "active",
     };
     this.store.saveSession(session);
-    return this.ingest({ ...options, now, sessionMode: "prepare", briefing: true, collectingDecision: true });
+    try { return await this.ingest({ ...options, now, onRequest: true, sessionMode: "prepare", briefing: true, collectingDecision: true }); }
+    finally { this.store.transaction(() => { if (this.store.getSession()?.id === session.id) this.store.saveSession({ ...session, status: "ended" }); }); }
   }
 
   /** Set or clear the current goal hypothesis. */
   setGoal(hypothesis: string | null, now: string = nowIso()): Goal {
-    const current = this.store.getGoal(now);
-    const goal = hypothesis
-      ? { ...current, hypothesis, confidence: 0.5, correctedByUser: true, needsCorrection: false, updatedAt: now }
-      : unsetGoal(now);
-    this.store.saveGoal(goal);
-    return goal;
+    return this.store.transaction(() => {
+      this.invalidate();
+      this.store.setLive(null);
+      this.store.saveSession(null);
+      this.store.briefQuestions(now);
+      const current = this.store.getGoal(now);
+      const goal = hypothesis
+        ? { ...current, id: randomUUID(), hypothesis: hypothesis.trim(), confidence: 0.9, correctedByUser: true, needsCorrection: false, updatedAt: now }
+        : unsetGoal(now);
+      this.store.saveGoal(goal);
+      return goal;
+    });
   }
 
   /** Record feedback from the surface taxonomy. */
   recordFeedback(kind: "AlreadyKnow" | "WrongTask" | "UsefulMoreLikeThis" | "ExplainMechanism" | "UsefulButLater", insightId: string | null, topic: string | null, now: string = nowIso()): void {
-    const goal = this.store.getGoal(now);
-    if (kind === "WrongTask") {
-      this.store.saveGoal({ ...goal, ...{ confidence: Math.min(goal.confidence, 0.25), needsCorrection: true, updatedAt: now } } as Goal);
-    }
-    this.store.insertFeedback(kind, insightId, topic, now);
+    this.store.transaction(() => {
+      const goal = this.store.getGoal(now);
+      if (kind === "WrongTask") {
+        this.invalidate();
+        this.store.setLive(null);
+        this.store.saveGoal({ ...goal, ...{ confidence: Math.min(goal.confidence, 0.25), needsCorrection: true, updatedAt: now } } as Goal);
+      }
+      const prefs = this.store.getPreferences();
+      if (kind === "AlreadyKnow" && insightId) prefs.knownSignatures.push(...this.store.signaturesFor(insightId));
+      if (kind === "ExplainMechanism" && topic) prefs.depthByTopic[topic] = "mechanism";
+      if (kind === "UsefulMoreLikeThis" && topic) prefs.topicWeights[topic] = Math.min(1.3, (prefs.topicWeights[topic] ?? 1) + 0.1);
+      if (kind === "UsefulButLater" && topic) prefs.topicWeights[topic] = 0.5;
+      this.store.savePreferences(prefs);
+      this.store.insertFeedback(kind, insightId, topic, now);
+    });
   }
 
   /** Public: capture from pluggable adapters, then run the core gate → explain path. */
   async ingest(options: IngestOptions): Promise<IngestResult> {
+    if (this.store.getPreferences().paused) return this.quiet("companion is paused");
     const now = options.now ?? nowIso();
+    const generation = this.store.stateRevision();
     let allObservations: Observation[] = [];
     for (const adapter of this.adapters) {
       try {
@@ -128,6 +149,9 @@ export class Panther {
         // One adapter failing must not silence the others.
       }
     }
+    if (generation !== this.store.stateRevision()) return this.quiet("request cancelled by a state change");
+    if (allObservations.length === 0 && options.onRequest) allObservations = this.store.latestObservations(DEFAULT_LIMIT);
+    if (allObservations.length === 0 && !options.onRequest) return this.quiet("waiting for new evidence");
     return this.ingestCore(this.dedupe(allObservations), options);
   }
 
@@ -138,14 +162,22 @@ export class Panther {
 
   /** Core capture → gate → explain path shared by all modes. */
   private async ingestCore(observations: Observation[], options: IngestOptions): Promise<IngestResult> {
+    if (this.store.getPreferences().paused) return this.quiet("companion is paused");
     const now = options.now ?? nowIso();
-    const goal = this.store.getGoal(now);
+    const { goal, revision: generation } = this.store.goalState(now);
     const prefs = this.store.getPreferences();
     const questions = this.store.listOpenQuestions();
     const summaries = this.store.recentSummaries(5);
     const paused = prefs.paused;
 
-    for (const obs of observations) this.store.insertObservation(obs);
+    const retained = this.store.withStateRevision(generation, () => {
+      for (const obs of observations) this.store.insertObservation(obs, goal.id);
+      return true;
+    });
+    if (!retained) return this.quiet("request cancelled by a state change");
+    const storedObservationIds = observations.map(obs => obs.id);
+    // Retain every bounded source event. Reason over the most recent slice.
+    observations = observations.slice(-DEFAULT_LIMIT);
 
     // Reason over the captured evidence (local first, ollama optional).
     const output = await this.reasoner.reason({
@@ -158,101 +190,111 @@ export class Panther {
       brief: options.sessionMode === "prepare",
       returnToTask: options.sessionMode === "follow",
     });
+    if (generation !== this.store.stateRevision()) return this.quiet("request cancelled by a state change");
+    return this.store.withStateRevision<IngestResult>(generation, () => {
+      const allowedEvidence = new Set([...observations.map(obs => obs.id), ...questions.flatMap(question => question.observationIds)]);
+      output.usedObservationIds = output.usedObservationIds.filter(id => allowedEvidence.has(id));
 
-    const signatures = observations.map((obs) => obs.signature);
-    const knownActive = this.knownSignaturesActive(prefs, signatures);
-    const addsNewMember = this.addsNewMember(observations);
+      const signatures = observations.map((obs) => obs.signature);
+      const knownActive = this.knownSignaturesActive(prefs, signatures);
+      const addsNewMember = this.addsNewMember(observations);
 
-    const relevance = scoreRelevance(goal, observations, questions, options.sessionMode === "prepare");
-    const novelty = scoreNovelty(signatures, knownActive, addsNewMember);
-    const preference = scorePreference(prefs, output.topic, signatures);
-    const routineSuccess = output.routineSuccess || routineFrom(observations);
+      const relevance = scoreRelevance(goal, observations, questions, options.sessionMode === "prepare");
+      const novelty = scoreNovelty(signatures, knownActive, addsNewMember);
+      const preference = scorePreference(prefs, output.topic, signatures);
+      const routineSuccess = output.routineSuccess || routineFrom(observations);
 
-    const session = this.store.getSession();
-    const decision: GateDecision = decideGate({
-      confidence: output.confidence,
-      relevance,
-      novelty,
-      preference,
-      threshold: this.threshold,
-      onRequest: !!options.onRequest,
-      paused,
-      goalNeedsCorrection: goal.needsCorrection,
-      routineSuccess,
-      briefing: options.sessionMode === "prepare",
-      sessionMode: session?.mode ?? "none",
-      sessionPaused: session?.status === "paused",
-      returnToTask: options.returnToTask ?? false,
-      naturalPause: !!options.naturalPause,
-      sameGroupQuietUpdate: this.sameGroupQuietUpdate(signatures, now),
-      collectingDecision: !!options.collectingDecision,
-    });
+      const session = this.store.getSession();
+      const decision: GateDecision = decideGate({
+        confidence: output.confidence,
+        relevance,
+        novelty,
+        preference,
+        threshold: this.threshold,
+        onRequest: !!options.onRequest,
+        paused,
+        goalNeedsCorrection: goal.needsCorrection,
+        routineSuccess,
+        briefing: options.sessionMode === "prepare",
+        sessionMode: session?.mode ?? "none",
+        sessionPaused: session?.status === "paused",
+        returnToTask: options.returnToTask ?? false,
+        naturalPause: !!options.naturalPause,
+        sameGroupQuietUpdate: this.sameGroupQuietUpdate(signatures, now),
+        collectingDecision: !!options.collectingDecision,
+      });
 
-    this.store.insertGateLog({
-      id: `gate-${Date.now()}`,
-      createdAt: now,
-      mode: options.sessionMode ?? "explain",
-      score: decision.score,
-      factors: decision.factors,
-      suppress: decision.suppressInterrupt,
-      reason: decision.reason,
-      observationIds: observations.map((o) => o.id),
-    });
+      this.store.insertGateLog({
+        id: `gate-${randomUUID()}`,
+        createdAt: now,
+        mode: options.sessionMode ?? "explain",
+        score: decision.score,
+        factors: decision.factors,
+        suppress: decision.suppressInterrupt,
+        reason: decision.reason,
+        observationIds: observations.map((o) => o.id),
+      });
 
-    // Hard suppress: nothing to show, insight expires.
-    if (decision.suppressInterrupt && !decision.updateLive) {
+      // Hard suppress: nothing to show, insight expires.
+      if (decision.suppressInterrupt && !decision.updateLive) {
+        this.store.expireDue(now);
+        if (routineSuccess) this.store.setLive(null);
+        return { raised: false, live: null, decision, insight: null, storedObservationIds };
+      }
+
+      // Build (or refresh) the insight + explanation.
+      const groupKey = groupKeyFor(observations);
+      const existing = this.store.findActiveBySignature(signatures, now);
+      const explanationId = existing?.explanationId;
+      const explanation: Explanation = {
+        id: explanationId ?? `exp-${randomUUID()}`,
+        whatItMeans: output.whatItMeans,
+        whyItMattersHere: output.whyItMattersHere,
+        nextCheck: output.nextCheck,
+        evidence: this.store.getObservations(output.usedObservationIds).map((obs) => ({ observationId: obs.id, providerId: obs.providerId, label: obs.label, locator: obs.locator })),
+        observed: output.observed,
+        inferred: output.inferred,
+        unknown: output.unknown,
+        confidence: output.confidence,
+        topic: output.topic,
+        createdAt: now,
+      };
+      this.store.saveExplanation(explanation);
+
+      const insight: Insight = {
+        id: existing?.id ?? `insight-${randomUUID()}`,
+        groupKey,
+        status: "transient",
+        explanationId: explanation.id,
+        observationIds: observations.map((o) => o.id),
+        expiresAt: addMinutes(now, this.insightTtlMinutes),
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      };
+      if (existing) this.store.updateInsight(insight, signatures);
+      else this.store.insertInsight(insight, signatures);
+      const question = questionTextFor(output);
+      if (question && output.topic !== "decision-brief") this.store.insertQuestion({ id: randomUUID(), text: question, observationIds: output.usedObservationIds, status: "open", createdAt: now, updatedAt: now });
+
+      const live: SurfaceCard | null = decision.updateLive
+        ? {
+            insightId: insight.id,
+            producedBy: options.sessionMode === "prepare" ? "prepare" : options.onRequest
+              ? "explain"
+              : options.sessionMode === "follow"
+                ? options.sessionMode
+                : "explain",
+            reasoning: decision.reason,
+            using: this.sources(),
+            goal,
+            explanation,
+          }
+        : null;
+
       this.store.expireDue(now);
-      return { raised: false, live: null, decision, insight: null, storedObservationIds: observations.map((o) => o.id) };
-    }
-
-    // Build (or refresh) the insight + explanation.
-    const groupKey = groupKeyFor(observations);
-    const existing = this.store.findActiveBySignature(signatures, now);
-    const explanationId = existing?.explanationId;
-    const explanation: Explanation = {
-      id: explanationId ?? `exp-${Date.now()}`,
-      whatItMeans: output.whatItMeans,
-      whyItMattersHere: output.whyItMattersHere,
-      nextCheck: output.nextCheck,
-      evidence: observations.map((obs) => ({ observationId: obs.id, providerId: obs.providerId, label: obs.label, locator: obs.locator })),
-      observed: output.observed,
-      inferred: output.inferred,
-      unknown: output.unknown,
-      confidence: output.confidence,
-      topic: output.topic,
-      createdAt: now,
-    };
-    this.store.saveExplanation(explanation);
-
-    const insight: Insight = {
-      id: existing?.id ?? `insight-${Date.now()}`,
-      groupKey,
-      status: "transient",
-      explanationId: explanation.id,
-      observationIds: observations.map((o) => o.id),
-      expiresAt: addMinutes(now, this.insightTtlMinutes),
-      createdAt: existing?.createdAt ?? now,
-      updatedAt: now,
-    };
-    this.store.insertInsight(insight, signatures);
-
-    const live: SurfaceCard | null = decision.updateLive
-      ? {
-          insightId: insight.id,
-          producedBy: options.onRequest
-            ? "explain"
-            : options.sessionMode === "follow" || options.sessionMode === "prepare"
-              ? options.sessionMode
-              : "explain",
-          reasoning: decision.reason,
-          using: this.sources(),
-          goal,
-          explanation,
-        }
-      : null;
-
-    this.store.expireDue(now);
-    return { raised: Boolean(live), live, decision, insight, storedObservationIds: observations.map((o) => o.id) };
+      if (live) this.store.setLive(live);
+      return { raised: Boolean(live), live, decision, insight, storedObservationIds };
+    }) ?? this.quiet("request cancelled by a state change");
   }
 
   /** Snapshot everything for export / delete / inspect. */
@@ -262,7 +304,15 @@ export class Panther {
 
   /** Delete all local state (user-controlled). */
   deleteAll(now: string = nowIso()): void {
+    this.invalidate();
     this.store.deleteAll(now);
+  }
+
+  /** Fence delayed reasoning when the operator pauses, changes goal, or deletes. */
+  invalidate(): void { this.store.invalidate(); }
+
+  private quiet(reason: string): IngestResult {
+    return { raised: false, live: null, insight: null, storedObservationIds: [], decision: { score: 0, factors: { confidence: 0, relevance: 0, novelty: 0, timing: 0, preference: 0 }, suppressInterrupt: true, updateLive: false, reason } };
   }
 
   // ---------- private ----------
@@ -278,7 +328,7 @@ export class Panther {
       seen.add(obs.id);
       out.push(obs);
     }
-    return out.slice(0, DEFAULT_LIMIT);
+    return out;
   }
 
   private knownSignaturesActive(prefs: Preferences, signatures: string[]): boolean {

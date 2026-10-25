@@ -20,7 +20,7 @@ export const DEFAULT_CONFIG: GateConfig = {
   followMinutes: 25,
   insightTtlMinutes: 45,
   reasoning: {
-    provider: "ollama",
+    provider: "local",
     ollamaUrl: "http://127.0.0.1:11434/api/generate",
     model: "qwen3.8:latest",
     fallbackToLocal: true,
@@ -28,6 +28,7 @@ export const DEFAULT_CONFIG: GateConfig = {
 };
 
 export function loadConfig(path: string | null): GateConfig {
+  path ??= process.env.PANTHER_CONFIG ?? null;
   if (!path) return structuredClone(DEFAULT_CONFIG);
   let parsed: unknown;
   try {
@@ -45,10 +46,10 @@ export function normalizeConfig(value: unknown): GateConfig {
   if (typeof raw.threshold === "number" && raw.threshold > 0 && raw.threshold < 1) {
     base.threshold = raw.threshold;
   }
-  if (typeof raw.followMinutes === "number" && raw.followMinutes >= 5 && raw.followMinutes <= 180) {
+  if (typeof raw.followMinutes === "number" && Number.isFinite(raw.followMinutes) && raw.followMinutes >= 5 && raw.followMinutes <= 180) {
     base.followMinutes = raw.followMinutes;
   }
-  if (typeof raw.insightTtlMinutes === "number" && raw.insightTtlMinutes >= 5 && raw.insightTtlMinutes <= 24 * 60) {
+  if (typeof raw.insightTtlMinutes === "number" && Number.isFinite(raw.insightTtlMinutes) && raw.insightTtlMinutes >= 5 && raw.insightTtlMinutes <= 24 * 60) {
     base.insightTtlMinutes = raw.insightTtlMinutes;
   }
   if (raw.reasoning && typeof raw.reasoning === "object") {
@@ -56,7 +57,7 @@ export function normalizeConfig(value: unknown): GateConfig {
     if (reasoning.provider === "local" || reasoning.provider === "ollama") {
       base.reasoning.provider = reasoning.provider;
     }
-    if (typeof reasoning.ollamaUrl === "string" && reasoning.ollamaUrl.startsWith("http")) {
+    if (typeof reasoning.ollamaUrl === "string" && isLoopbackUrl(reasoning.ollamaUrl)) {
       base.reasoning.ollamaUrl = reasoning.ollamaUrl;
     }
     if (typeof reasoning.model === "string" && reasoning.model.trim()) {
@@ -67,6 +68,11 @@ export function normalizeConfig(value: unknown): GateConfig {
     }
   }
   return base;
+}
+
+export function isLoopbackUrl(value: string): boolean {
+  try { const url = new URL(value); return ["http:", "https:"].includes(url.protocol) && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) && !url.username && !url.password; }
+  catch { return false; }
 }
 
 export function defaultPreferences(): {

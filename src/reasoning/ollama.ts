@@ -4,6 +4,8 @@ import type { ReasonerInput, ReasonerOutput } from "../domain.js";
 // not @types/node bundles node:fetch types.
 declare const fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 import { Reasoner, buildReasoningPrompt, loadPromptTemplate, reasonLocally } from "../core/reasoner.js";
+import { isLoopbackUrl } from "../config.js";
+import { promptPath } from "../paths.js";
 
 export class OllamaReasoner implements Reasoner {
   readonly id = "ollama";
@@ -13,6 +15,7 @@ export class OllamaReasoner implements Reasoner {
   private template: string | null = null;
 
   constructor(url: string, model: string, options: { fallbackToLocal: boolean }) {
+    if (!isLoopbackUrl(url)) throw new Error("Ollama must use a local loopback URL.");
     this.url = url;
     this.model = model;
     this.fallbackToLocal = options.fallbackToLocal;
@@ -34,7 +37,7 @@ export class OllamaReasoner implements Reasoner {
   private promptTemplate(input: ReasonerInput): string {
     if (!this.template) {
       try {
-        this.template = loadPromptTemplate("prompts/reasoner.md");
+        this.template = loadPromptTemplate(promptPath());
       } catch {
         this.template = "";
       }
@@ -56,10 +59,12 @@ export class OllamaReasoner implements Reasoner {
       headers: { "content-type": "application/json" },
       body,
       signal: AbortSignal.timeout(60_000),
+      redirect: "error",
     });
     if (!res.ok) throw new Error(`ollama ${res.status}`);
     const data = await res.json();
-    return typeof data.response === "string" ? data.response : String(data);
+    if (data.done !== true || typeof data.response !== "string") throw new Error("Incomplete local model response");
+    return data.response;
   }
 
   private parseJson(text: string): ReasonerOutput | null {
@@ -75,6 +80,8 @@ export class OllamaReasoner implements Reasoner {
   }
 
   private coerce(record: Record<string, unknown>): ReasonerOutput | null {
+    if (!["whatItMeans", "whyItMattersHere", "nextCheck", "topic"].every(key => typeof record[key] === "string" && (record[key] as string).trim())) return null;
+    if (typeof record.decisionNeeded !== "boolean" || typeof record.routineSuccess !== "boolean" || typeof record.confidence !== "number" || !Number.isFinite(record.confidence)) return null;
     const confidence = Number(record.confidence);
     return {
       whatItMeans: typeof record.whatItMeans === "string" ? String(record.whatItMeans) : "",
@@ -86,8 +93,8 @@ export class OllamaReasoner implements Reasoner {
       unknown: Array.isArray(record.unknown) ? record.unknown.filter((x) => typeof x === "string") : [],
       confidence: Number.isFinite(confidence) ? Math.min(1, Math.max(0, confidence)) : 0.5,
       topic: typeof record.topic === "string" ? String(record.topic) : "general",
-      decisionNeeded: Boolean(record.decisionNeeded),
-      routineSuccess: Boolean(record.routineSuccess),
+      decisionNeeded: record.decisionNeeded,
+      routineSuccess: record.routineSuccess,
     };
   }
 }

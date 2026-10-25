@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { createServer } from "node:http";
+import { createCompanionServer } from "./http.js";
+import { CompanionController } from "./controller.js";
 import { Store } from "./state/store.js";
 import { Panther } from "./ingest.js";
 import { LocalReasoner } from "./core/reasoner.js";
@@ -9,9 +10,8 @@ import { BrowserAdapter } from "./adapters/browser.js";
 import { DesktopCaptureAdapter } from "./adapters/desktop.js";
 import { AgentEventAdapter } from "./adapters/agent.js";
 import { loadConfig } from "./config.js";
-import { cardPath, pantherHome } from "./paths.js";
+import { pantherHome } from "./paths.js";
 import type { IngestResult } from "./domain.js";
-import { readFileSync } from "node:fs";
 
 const HOME = pantherHome();
 const DEFAULT_DB = `${HOME}/state.sqlite`;
@@ -59,8 +59,15 @@ async function run() {
     }
     case "follow": {
       const p = panther(dbPath);
-      const { session, result } = await p.follow({ now: nowIso() });
-      console.log(JSON.stringify({ session, ...summary(result) }, null, 2));
+      const controller = new CompanionController(p);
+      console.log(JSON.stringify(await controller.action("follow"), null, 2));
+      controller.start();
+      const keepAlive = setInterval(() => {
+        if (controller.status().session?.status !== "active") close();
+      }, 1000);
+      let closed = false;
+      const close = () => { if (closed) return; closed = true; clearInterval(keepAlive); controller.stop(); p.store.close(); };
+      process.once("SIGTERM", close); process.once("SIGINT", close);
       break;
     }
     case "prepare": {
@@ -108,86 +115,16 @@ async function run() {
     case "serve": {
       const p = panther(dbPath);
       const port = Number(process.env.PANTHER_PORT || 8765);
-      const server = createServer((req, res) => {
-        const url = new URL(req.url ?? "", `http://localhost:${port}`);
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        res.setHeader("Access-Control-Allow-Headers", "content-type");
-        if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }
-
-        const handle = async () => {
-          const pathname = url.pathname;
-          if (pathname === "/" || pathname === "/card") {
-            const html = readFileSync(cardPath(), "utf8");
-            res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-            res.end(html);
-            return;
-          }
-          if (pathname === "/api/status") {
-            const live = p.store.getLive();
-            const goal = p.store.getGoal(nowIso());
-            res.writeHead(200, { "content-type": "application/json" });
-            res.end(JSON.stringify({ goal, live: live ?? null, sources: p.sources() }));
-            return;
-          }
-          if (pathname === "/api/explain" && req.method === "POST") {
-            const result = await p.explain({ onRequest: true, now: nowIso() });
-            res.writeHead(200, { "content-type": "application/json" });
-            res.end(JSON.stringify({ ...result, live: result.live ?? null }));
-            return;
-          }
-          if (pathname === "/api/follow" && req.method === "POST") {
-            const { session, result } = await p.follow({ now: nowIso() });
-            res.writeHead(200, { "content-type": "application/json" });
-            res.end(JSON.stringify({ session, ...result, live: result.live ?? null }));
-            return;
-          }
-          if (pathname === "/api/prepare" && req.method === "POST") {
-            const result = await p.prepare({ now: nowIso(), naturalPause: true });
-            res.writeHead(200, { "content-type": "application/json" });
-            res.end(JSON.stringify({ ...result, live: result.live ?? null }));
-            return;
-          }
-          if (pathname === "/api/goal" && req.method === "POST") {
-            let body = "";
-            for await (const chunk of req as unknown as AsyncIterable<Buffer>) body += chunk.toString();
-            const parsed = JSON.parse(body || "{}");
-            const goal = p.setGoal(parsed.hypothesis ?? null, nowIso());
-            res.writeHead(200, { "content-type": "application/json" });
-            res.end(JSON.stringify(goal));
-            return;
-          }
-          if (pathname === "/api/feedback" && req.method === "POST") {
-            let body = "";
-            for await (const chunk of req as unknown as AsyncIterable<Buffer>) body += chunk.toString();
-            const parsed = JSON.parse(body || "{}");
-            p.recordFeedback(parsed.kind, parsed.insightId ?? null, parsed.topic ?? null, nowIso());
-            res.writeHead(200, { "content-type": "application/json" });
-            res.end(JSON.stringify({ ok: true }));
-            return;
-          }
-          if (pathname === "/api/export") {
-            res.writeHead(200, { "content-type": "application/json" });
-            res.end(JSON.stringify(p.exportAll(), null, 2));
-            return;
-          }
-          if (pathname === "/api/delete" && req.method === "POST") {
-            p.deleteAll(nowIso());
-            res.writeHead(200, { "content-type": "application/json" });
-            res.end(JSON.stringify({ ok: true }));
-            return;
-          }
-          res.writeHead(404, { "content-type": "application/json" });
-          res.end(JSON.stringify({ error: "not found" }));
-        };
-        handle().catch((err) => {
-          res.writeHead(500, { "content-type": "application/json" });
-          res.end(JSON.stringify({ error: String(err) }));
-        });
+      if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("PANTHER_PORT must be a valid port.");
+      const controller = new CompanionController(p);
+      const server = createCompanionServer(controller);
+      controller.start();
+      server.listen(port, "127.0.0.1", () => {
+        console.log(`Panther Companion: http://127.0.0.1:${port}`);
       });
-      server.listen(port, () => {
-        console.log(`panther serve http://localhost:${port}  (db: ${dbPath})`);
-      });
+      server.on("error", error => { console.error(error.message); controller.stop(); process.exitCode = 1; });
+      const close = () => { controller.stop(); server.close(() => { p.store.close(); }); };
+      process.once("SIGTERM", close); process.once("SIGINT", close);
       break;
     }
     default:
