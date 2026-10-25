@@ -14,6 +14,7 @@
   #root { height: 100%; display: grid; grid-template-rows: 44px 1fr 40px; overflow: hidden; min-height: 0; }
   .bar { display: flex; align-items: center; gap: 8px; padding: 0 10px; border-bottom: 1px solid var(--border); background: #0f1116; -webkit-app-region: drag; }
   .bar .brand { font-weight: 700; letter-spacing: 0.4px; font-size: 12px; }
+  .bar .version { color: var(--muted); font-size: 11px; letter-spacing: 0.5px; }
   .bar .mode { margin-left: auto; display: flex; gap: 6px; }
   .bar button { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 4px 9px; border-radius: 5px; font-size: 11px; cursor: pointer; -webkit-app-region: no-drag; }
   .bar button.active { border-color: var(--accent); color: var(--accent); }
@@ -58,6 +59,7 @@
 <div id="root">
   <div class="bar">
     <div class="brand">panther</div>
+    <div class="version" id="app-version">v1.0.0</div>
     <div style="flex:1"></div>
     <div class="mode">
       <button id="mode-explain" class="active" onclick="setMode('explain')">Explain this</button>
@@ -187,6 +189,8 @@ class App {
   async applyStatus(status) {
     this.goal = status.goal;
     this.renderGoal();
+    const versionEl = document.getElementById("app-version");
+    if (versionEl) versionEl.textContent = "v" + (status.version ?? "1.0.0");
     if (status.live) {
       this.live = status.live;
       this.renderCard(this.live);

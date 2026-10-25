@@ -81,6 +81,7 @@ function createWindow() {
       goal: p.store.getGoal(now),
       live: p.store.getLive(),
       sources: p.sources(),
+      version: "1.0.0",
     })
   })
 }
@@ -105,6 +106,7 @@ function broadcastUpdate(p: Panther, result: any, extra?: any) {
     live: result.live ?? null,
     decision: result.decision,
     sources: p.sources(),
+    version: "1.0.0",
     ...extra,
   }
   if (mainWindow) {

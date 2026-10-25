@@ -94,6 +94,7 @@ function createWindow() {
       goal: p.store.getGoal(now),
       live: p.store.getLive(),
       sources: p.sources(),
+      version: "1.0.0",
     })
     console.log('Card loaded.')
   })
@@ -119,6 +120,7 @@ function broadcastUpdate(p, result, extra) {
     live: result.live ?? null,
     decision: result.decision,
     sources: p.sources(),
+    version: "1.0.0",
     ...extra,
   }
   if (mainWindow) {
