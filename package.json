@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Local-first companion that explains current evidence for the current goal, and stays quiet otherwise.",
+  "main": "dist/src/electron/main.js",
   "bin": {
     "panther": "dist/src/cli.js"
   },
@@ -12,7 +13,8 @@
     "test": "npm run build && node --test dist/test/",
     "eval": "npm run build && node dist/eval/run.js",
     "serve": "node dist/src/cli.js serve",
-    "start": "npm run build && node dist/src/cli.js serve",
+    "electron": "electron .",
+    "start": "npm run build && electron .",
     "explain": "npm run build && node dist/src/cli.js explain",
     "panther": "node dist/src/cli.js"
   },
@@ -21,6 +23,10 @@
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "electron": "^35.7.5",
     "typescript": "^5.9.3"
+  },
+  "allowScripts": {
+    "electron@35.7.5": true
   }
 }

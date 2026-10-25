@@ -123,10 +123,38 @@
 const BASE = "";
 let app = null;
 
+// Unified transport: Electron IPC when available, HTTP fetch otherwise.
+const IPC = typeof window !== "undefined" && window.pantherAPI ? window.pantherAPI : null;
+
 async function json(path, opts = {}) {
   const res = await fetch(path, { headers: { "content-type": "application/json" }, ...opts });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
+}
+
+async function tStatus() {
+  if (IPC) return IPC.status();
+  return json("/api/status");
+}
+async function tExplain() {
+  if (IPC) return IPC.explain();
+  return json("/api/explain", { method: "POST" });
+}
+async function tFollow() {
+  if (IPC) return IPC.follow();
+  return json("/api/follow", { method: "POST" });
+}
+async function tPrepare() {
+  if (IPC) return IPC.prepare();
+  return json("/api/prepare", { method: "POST" });
+}
+async function tSetGoal(hypothesis) {
+  if (IPC) return IPC.setGoal(hypothesis);
+  return json("/api/goal", { method: "POST", body: JSON.stringify({ hypothesis }) });
+}
+async function tFeedback(kind, insightId, topic) {
+  if (IPC) return IPC.feedback(kind, insightId, topic);
+  return json("/api/feedback", { method: "POST", body: JSON.stringify({ kind, insightId, topic }) });
 }
 
 class App {
@@ -135,27 +163,67 @@ class App {
     this.live = null;
     this.goal = null;
     this.refreshInterval = null;
+    this.ipcUnsubscribe = null;
     this.bind();
     this.refresh();
     this.refreshInterval = setInterval(() => this.refresh(), 4000);
+    this.setupIPC();
   }
   bind() {
     document.getElementById("goal-input").addEventListener("keydown", (e) => {
       if (e.key === "Enter") { e.preventDefault(); this.setGoal(); }
     });
+    // Hide the card on Escape in Electron mode.
+    if (IPC) {
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") IPC.hide(); });
+    }
   }
-  setMode(m) {
+  setupIPC() {
+    if (!IPC) return;
+    this.ipcUnsubscribe = IPC.onCardUpdate((data) => {
+      this.applyStatus(data);
+    });
+  }
+  async applyStatus(status) {
+    this.goal = status.goal;
+    this.renderGoal();
+    if (status.live) {
+      this.live = status.live;
+      this.renderCard(this.live);
+      document.getElementById("empty").classList.add("hidden");
+      document.getElementById("card").classList.add("shown");
+    } else {
+      document.getElementById("empty").classList.remove("hidden");
+      document.getElementById("card").classList.remove("shown");
+    }
+  }
+  async refresh() {
+    try {
+      const status = await tStatus();
+      this.applyStatus(status);
+    } catch (err) {
+      document.getElementById("empty").textContent = "panther not reachable: " + err.message;
+    }
+  }
+  async setMode(m) {
     this.mode = m;
     for (const b of document.querySelectorAll(".bar button")) b.classList.remove("active");
     document.getElementById(`mode-${m}`).classList.add("active");
     document.getElementById("footer-mode").textContent = "mode: " + m;
-    this.refresh();
+    try {
+      if (m === "explain") await tExplain();
+      else if (m === "follow") await tFollow();
+      else if (m === "prepare") await tPrepare();
+      this.refresh();
+    } catch (err) {
+      document.getElementById("empty").textContent = "panther error: " + err.message;
+    }
   }
   async setGoal() {
     const input = document.getElementById("goal-input");
     const hypothesis = input.value.trim();
     if (!hypothesis) return;
-    await json("/api/goal", { method: "POST", body: JSON.stringify({ hypothesis }) });
+    await tSetGoal(hypothesis);
     input.value = "";
     this.refresh();
   }
@@ -164,28 +232,12 @@ class App {
     input.focus();
   }
   async wrongTask() {
-    await json("/api/feedback", { method: "POST", body: JSON.stringify({ kind: "WrongTask", insightId: this.live ? this.live.insightId : null, topic: this.live ? this.live.explanation.topic : null }) });
+    await tFeedback("WrongTask", this.live ? this.live.insightId : null, this.live ? this.live.explanation.topic : null);
     this.refresh();
   }
   async feedback(kind) {
-    await json("/api/feedback", { method: "POST", body: JSON.stringify({ kind, insightId: this.live ? this.live.insightId : null, topic: this.live ? this.live.explanation.topic : null }) });
+    await tFeedback(kind, this.live ? this.live.insightId : null, this.live ? this.live.explanation.topic : null);
     this.refresh();
-  }
-  async refresh() {
-    try {
-      const status = await json("/api/status");
-      this.goal = status.goal;
-      this.renderGoal();
-      if (status.live) {
-        this.live = status.live;
-        this.renderCard(this.live);
-      } else {
-        document.getElementById("empty").classList.remove("hidden");
-        document.getElementById("card").classList.remove("shown");
-      }
-    } catch (err) {
-      document.getElementById("empty").textContent = "panther server not reachable: " + err.message;
-    }
   }
   renderGoal() {
     const g = this.goal;
@@ -231,7 +283,6 @@ class App {
     renderList("s-observed", e.observed);
     renderList("s-inferred", e.inferred);
     renderList("s-unknown", e.unknown);
-    // mode badges
     for (const b of document.querySelectorAll("footer button")) b.classList.remove("active");
     document.getElementById("footer-mode").textContent = "mode: " + this.mode;
   }
