@@ -123,7 +123,7 @@ async function handleLine(line: string) {
       result = {
         protocolVersion: "2024-11-05",
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: "panther-companion", version: "0.1.0" },
+        serverInfo: { name: "panther-companion", version: "1.0.0" },
       };
     } else if (request.method === "ping") {
       result = {};

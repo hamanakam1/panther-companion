@@ -1,6 +1,6 @@
 {
   "name": "panther-companion",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Local-first companion that explains current evidence for the current goal, and stays quiet otherwise.",
