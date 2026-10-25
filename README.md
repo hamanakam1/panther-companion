@@ -33,6 +33,8 @@ The desktop window respects the chosen display's work area, including negative c
 
 Routine successful commands remain quiet. Empty captures state that evidence is missing. The default reasoner uses deterministic local rules, so the basic workflow responds immediately without waiting for a model.
 
+When explaining retained evidence, the local reasoner uses the latest completed terminal result only within the same command, directory, branch and source location. Event timestamps take precedence over arrival order; equal timestamps use the host's stable input order. A result with missing context cannot replace one with known, different context. Earlier results remain in local history and exports. Current failures and source disagreements take precedence over imported proposals; **Prepare next decision** still presents the explicitly stored open questions.
+
 For a selected note, a standalone `Next useful check:` or `Next step:` label brings your proposed action onto the card with explicit user-supplied attribution. The extracted check is bounded, remains unverified, and never overrides an observed command failure or source disagreement.
 
 ## Work with Panther Intent Capture

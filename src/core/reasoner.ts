@@ -51,21 +51,46 @@ export class LocalReasoner implements Reasoner {
 
 export function reasonLocally(input: ReasonerInput): ReasonerOutput {
   if (input.brief && input.openQuestions.length) return brief(input);
-  const intent = input.observations.find(obs => obs.providerId === "panther-ic");
-  if (intent) return intentExplanation(input, intent);
-  if (input.returnToTask && input.openQuestions.length > 0) return returning(input);
+  // Select current results for reasoning only; the store/export keeps history.
+  input = { ...input, observations: currentEvidence(input.observations) };
   const mismatch = findMismatch(input.observations);
   if (mismatch) return mismatchExplanation(input, mismatch);
   const agents = input.observations.filter((obs) => obs.providerId === "agent");
   if (agents.length >= 2 && sharesSignature(agents)) return multiAgent(input, agents);
-  const failure = input.observations.find(isFailure);
+  const failure = input.observations.findLast(isFailure);
   if (failure?.providerId === "agent") return agentFailure(input, failure);
   if (failure) return failureExplanation(input, failure);
+  const intent = input.observations.findLast(obs => obs.providerId === "panther-ic");
+  if (intent) return intentExplanation(input, intent);
+  if (input.returnToTask && input.openQuestions.length > 0) return returning(input);
   if (isRoutineSuccess(input.observations)) return routine(input);
   if (input.observations.length === 0) return emptyCapture(input);
   const proposedCheck = manualNextCheck(input);
   if (proposedCheck) return proposedCheck;
   return thin(input);
+}
+
+/** A newer completed command result supersedes only the same captured context. */
+function currentEvidence(observations: Observation[]): Observation[] {
+  const ordered = observations.map((observation, index) => {
+    const payload = asRecord(observation.payload);
+    // JSONL replay may arrive later than its original event. Prefer its stated
+    // time; an invalid explicit timestamp must not erase a known prior failure.
+    const timestamp = payload?.timestamp ?? observation.capturedAt;
+    const parsed = typeof timestamp === "string" ? Date.parse(timestamp) : NaN;
+    const time = Number.isFinite(parsed) ? parsed : null;
+    const command = readString(payload, "command");
+    const key = observation.providerId === "terminal" && command?.trim()
+      && Number.isInteger(payload?.exitCode) && time !== null
+      ? JSON.stringify([command, readString(payload, "cwd"), readString(payload, "gitBranch"), observation.locator])
+      : null;
+    return { observation, index, time, key };
+  }).sort((left, right) => (left.time ?? -Infinity) - (right.time ?? -Infinity) || left.index - right.index);
+  const latest = new Map<string, number>();
+  for (const item of ordered) if (item.key !== null) latest.set(item.key, item.index);
+  // Unclassifiable results are retained, not treated as evidence of recovery.
+  // Equal timestamps retain the host's stable input order (last result wins).
+  return ordered.filter(item => item.key === null || latest.get(item.key) === item.index).map(item => item.observation);
 }
 
 /** Display an explicitly supplied next check as a proposal, never authority. */
