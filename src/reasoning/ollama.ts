@@ -48,13 +48,14 @@ export class OllamaReasoner implements Reasoner {
       prompt,
       format: "json",
       stream: false,
+      think: false,
       options: { temperature: 0.2, num_predict: 700 },
     });
     const res = await fetch(this.url, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body,
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(60_000),
     });
     if (!res.ok) throw new Error(`ollama ${res.status}`);
     const data = await res.json();

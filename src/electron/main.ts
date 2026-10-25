@@ -9,6 +9,7 @@ const screen = electron.screen
 import { Panther } from '../ingest.js'
 import { Store } from '../state/store.js'
 import { LocalReasoner } from '../core/reasoner.js'
+import { OllamaReasoner } from '../reasoning/ollama.js'
 import { TerminalAdapter } from '../adapters/terminal.js'
 import { BrowserAdapter } from '../adapters/browser.js'
 import { AgentEventAdapter } from '../adapters/agent.js'
@@ -35,7 +36,9 @@ function getPanther(): Panther {
       new DesktopCaptureAdapter(),
       new AgentEventAdapter(),
     ]
-    const reasoner = new LocalReasoner()
+    const reasoner = config.reasoning.provider === "ollama"
+      ? new OllamaReasoner(config.reasoning.ollamaUrl, config.reasoning.model, { fallbackToLocal: config.reasoning.fallbackToLocal })
+      : new LocalReasoner()
     panther = new Panther({
       store,
       adapters,
