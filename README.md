@@ -97,6 +97,8 @@ Set `PANTHER_CONFIG` to a JSON configuration file to opt into Ollama:
 
 Only HTTP(S) loopback model URLs without credentials are accepted. Redirects are rejected. Model calls have a 60-second timeout and require a completed response; with `fallbackToLocal: true`, failures use deterministic local rules. Model-generated claims remain proposals, not verified facts. Automated tests do not establish live model quality or latency.
 
+Both reasoners use the same current-evidence selection, so a successful rerun supersedes an earlier result only for the same captured command context. Imported capture facts keep their producer attribution and unresolved outcomes; model interpretations and proposed checks remain explicitly labeled. Current failures and stored decision questions retain priority over imported proposals. Invalid response types or citations are rejected, and local fallback is visibly disclosed in the explanation only when `fallbackToLocal` is enabled; disabling it makes an unsuccessful model call fail instead.
+
 ## CLI and integration
 
 ```text

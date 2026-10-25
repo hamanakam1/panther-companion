@@ -71,7 +71,7 @@ export function reasonLocally(input: ReasonerInput): ReasonerOutput {
 }
 
 /** A newer completed command result supersedes only the same captured context. */
-function currentEvidence(observations: Observation[]): Observation[] {
+export function currentEvidence(observations: Observation[]): Observation[] {
   const ordered = observations.map((observation, index) => {
     const payload = asRecord(observation.payload);
     // JSONL replay may arrive later than its original event. Prefer its stated
@@ -124,7 +124,7 @@ function manualNextCheck(input: ReasonerInput): ReasonerOutput | null {
   return null;
 }
 
-function intentExplanation(input: ReasonerInput, intent: Observation): ReasonerOutput {
+export function intentExplanation(input: ReasonerInput, intent: Observation): ReasonerOutput {
   const payload = asRecord(intent.payload) ?? {};
   const strings = (key: string) => Array.isArray(payload[key]) ? (payload[key] as unknown[]).filter((item): item is string => typeof item === "string") : [];
   const evidence = readString(payload, "observedEvidence") ?? "";
