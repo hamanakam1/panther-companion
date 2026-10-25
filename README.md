@@ -33,6 +33,8 @@ The desktop window respects the chosen display's work area, including negative c
 
 Routine successful commands remain quiet. Empty captures state that evidence is missing. The default reasoner uses deterministic local rules, so the basic workflow responds immediately without waiting for a model.
 
+For a selected note, a standalone `Next useful check:` or `Next step:` label brings your proposed action onto the card with explicit user-supplied attribution. The extracted check is bounded, remains unverified, and never overrides an observed command failure or source disagreement.
+
 ## Work with Panther Intent Capture
 
 In Intent Capture, review a captured workflow and **export its intent bundle JSON**. In Companion, choose **Import from Intent Capture**, select the file, inspect its source, goal and proposal count, then import it. Adopting the captured goal is a separate checkbox, off by default.

@@ -63,7 +63,40 @@ export function reasonLocally(input: ReasonerInput): ReasonerOutput {
   if (failure) return failureExplanation(input, failure);
   if (isRoutineSuccess(input.observations)) return routine(input);
   if (input.observations.length === 0) return emptyCapture(input);
+  const proposedCheck = manualNextCheck(input);
+  if (proposedCheck) return proposedCheck;
   return thin(input);
+}
+
+/** Display an explicitly supplied next check as a proposal, never authority. */
+function manualNextCheck(input: ReasonerInput): ReasonerOutput | null {
+  for (const observation of [...input.observations].reverse()) {
+    if (observation.providerId !== "manual") continue;
+    const note = (readString(asRecord(observation.payload), "text") ?? observation.summary).slice(0, 12000);
+    // Recognize a standalone label, not a mention of the label inside a sentence.
+    const match = note.match(/(?:^|[\r\n]|[.!?][ \t]+)[ \t]*(?:[-*][ \t]+)?(?:next useful check|next step)[ \t]*:[ \t]*([^\r\n]+)/i);
+    if (!match) continue;
+    const supplied = match[1].replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim();
+    const firstSentence = supplied.split(/(?<=[.!?])[ \t]+(?=[A-Z])/, 1)[0];
+    if (!firstSentence) continue;
+    return {
+      whatItMeans: "Your selected note includes a proposed next step.",
+      whyItMattersHere: `${goalSentence(input)} This next step comes from your attached note and still needs your judgment. It grants no execution authority.`,
+      nextCheck: `User-supplied proposal: ${excerpt(firstSentence, 600)}`,
+      usedObservationIds: [observation.id],
+      observed: [`You attached this note (its claims are not independently verified): ${excerpt(note, 600)}`],
+      inferred: [],
+      unknown: [
+        "Whether this proposed check has been performed or would satisfy the goal.",
+        ...(firstSentence.length > 600 ? ["The displayed proposal is truncated; inspect the full attached note before acting."] : []),
+      ],
+      confidence: 0.6,
+      topic: "user-proposed-next-check",
+      decisionNeeded: false,
+      routineSuccess: false,
+    };
+  }
+  return null;
 }
 
 function intentExplanation(input: ReasonerInput, intent: Observation): ReasonerOutput {

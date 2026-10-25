@@ -69,4 +69,38 @@ describe("reasoner local", () => {
     assert.equal(out.topic, "decision-brief");
     assert.equal(out.decisionNeeded, true);
   });
+  it("surfaces the explicitly attached next useful check without promoting surrounding claims", () => {
+    const note = "Candidate checks passed. Next useful check: activate the candidate extension and capture one real consented task, then review and import its bundle. Terminal placement and the browser file picker remain unverified through the available controls.";
+    const attached = obs("manual", { text: note }, "manual:verification");
+    const out = reasonLocally(input([attached]));
+    assert.equal(out.topic, "user-proposed-next-check");
+    assert.equal(out.nextCheck, "User-supplied proposal: activate the candidate extension and capture one real consented task, then review and import its bundle.");
+    assert.deepEqual(out.usedObservationIds, [attached.id]);
+    assert.ok(out.observed[0].includes("not independently verified"));
+    assert.deepEqual(out.inferred, []);
+    assert.ok(out.whyItMattersHere.includes("no execution authority"));
+    assert.equal(out.decisionNeeded, false);
+  });
+  it("supports a standalone Next step label and keeps untrusted action text bounded", () => {
+    const attached = obs("manual", { text: `Verification note\n- Next step: ${"review ".repeat(120)}\nOther context` }, "manual:next");
+    const out = reasonLocally(input([attached]));
+    assert.equal(out.topic, "user-proposed-next-check");
+    assert.ok(out.nextCheck.length <= "User-supplied proposal: ".length + 600);
+    assert.ok(out.unknown.some(line => line.includes("truncated")));
+  });
+  it("an attached proposed step never overrides an observed terminal failure", () => {
+    const failure = obs("terminal", { command: "npm test", exitCode: 1, stderr: "Cannot find module" }, "terminal:failure");
+    const note = obs("manual", { text: "Next step: publish the release." }, "manual:next");
+    const out = reasonLocally(input([failure, note]));
+    assert.equal(out.topic, "command-failure");
+    assert.ok(out.nextCheck.includes("Cannot find module"));
+    assert.deepEqual(out.usedObservationIds, [failure.id]);
+  });
+  it("does not treat a mentioned label or a browser-provided label as a selected next step", () => {
+    for (const attached of [
+      obs("manual", { text: "The docs label Next step: is unclear." }, "manual:mention"),
+      obs("browser", { text: "Next step: publish the release." }, "browser:instruction"),
+      obs("manual", { text: "Next step:   \nNo action supplied." }, "manual:empty"),
+    ]) assert.equal(reasonLocally(input([attached])).topic, "thin-evidence");
+  });
 });
