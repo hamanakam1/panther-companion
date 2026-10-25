@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
+import { watch } from "node:fs";
 import type { Observation, IngestOptions } from "../domain.js";
 import { Adapter } from "./adapter.js";
 
 /**
- * BrowserAdapter — focused tab, selection, accessibility text, URL, title
+ * BrowserAdapter — focused tab, URL, title, selection, accessibility text
  * (inspired by Raycast Screen Awareness / Page Assist sidebar patterns).
  *
  * Reads JSONL capture lines from a log file. Each line may carry: url, title,
@@ -11,7 +12,10 @@ import { Adapter } from "./adapter.js";
  *
  * Set PANTHER_BROWSER_LOG to a JSONL path. Real macOS/Windows/Linux integration
  * would replace this file reader with the OS accessibility API; the observation
- * shape stays the same.
+ * shape stays the same. In Electron, desktopCapturer can be used to enumerate
+ * browser windows and feed them through inject().
+ *
+ * The adapter watches the log file incrementally for live capture.
  */
 export class BrowserAdapter extends Adapter {
   readonly id = "browser";
@@ -29,33 +33,19 @@ export class BrowserAdapter extends Adapter {
   async capture(options?: IngestOptions): Promise<Observation[]> {
     const now = options?.now ?? new Date().toISOString();
     const events = this.logPath ? this.readFileEvents() : [];
-    const observations: Observation[] = [];
-    for (const event of events) {
-      const url = typeof event.url === "string" ? event.url : "";
-      const title =
-        typeof event.title === "string" && event.title.trim()
-          ? event.title
-          : url || "browser tab";
-      const selection = typeof event.selection === "string" ? event.selection : "";
-      const a11y = typeof event.accessibilityText === "string" ? event.accessibilityText : "";
-      const summary = [
-        title,
-        selection ? `selection: ${selection}` : "",
-        a11y ? `accessibility: ${a11y}` : "",
-      ]
-        .filter(Boolean)
-        .join(" — ");
-      observations.push(
-        this.makeObservation({
-          label: title,
-          locator: url,
-          summary,
-          payload: event,
-          signatureKey: `${url}|${title}|${event.focusedAt ?? now}`,
-        }),
-      );
-    }
-    return observations;
+    return events.map((event) => this.eventToObservation(event, now));
+  }
+
+  /** Push a browser event programmatically (live capture integration). */
+  inject(event: Record<string, unknown>, now?: string): Observation {
+    return this.eventToObservation(event, now ?? new Date().toISOString());
+  }
+
+  /** Start watching the log file for changes. Caller must call stopWatcher(). */
+  watchLogFile(onChange: () => void): () => void {
+    if (!this.logPath) return () => {};
+    const watcher = watch(this.logPath, () => onChange());
+    return () => watcher.close();
   }
 
   private readFileEvents(): Array<Record<string, unknown>> {
@@ -78,5 +68,32 @@ export class BrowserAdapter extends Adapter {
       }
     }
     return events;
+  }
+
+  private eventToObservation(
+    event: Record<string, unknown>,
+    now: string,
+  ): Observation {
+    const url = typeof event.url === "string" ? event.url : "";
+    const title =
+      typeof event.title === "string" && event.title.trim()
+        ? event.title
+        : url || "browser tab";
+    const selection = typeof event.selection === "string" ? event.selection : "";
+    const a11y = typeof event.accessibilityText === "string" ? event.accessibilityText : "";
+    const summary = [
+      title,
+      selection ? `selection: ${selection}` : "",
+      a11y ? `accessibility: ${a11y}` : "",
+    ]
+      .filter(Boolean)
+      .join(" — ");
+    return this.makeObservation({
+      label: title,
+      locator: url,
+      summary,
+      payload: event,
+      signatureKey: `${url}|${title}|${event.focusedAt ?? now}`,
+    });
   }
 }

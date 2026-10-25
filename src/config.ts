@@ -20,7 +20,7 @@ export const DEFAULT_CONFIG: GateConfig = {
   followMinutes: 25,
   insightTtlMinutes: 45,
   reasoning: {
-    provider: "local",
+    provider: "ollama",
     ollamaUrl: "http://127.0.0.1:11434/api/generate",
     model: "qwen3.8:latest",
     fallbackToLocal: true,
