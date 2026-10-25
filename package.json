@@ -9,7 +9,7 @@
     "panther": "dist/src/cli.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && cp surface/card.html dist/surface/card.html",
     "test": "npm run build && node --test dist/test/",
     "eval": "npm run build && node dist/eval/run.js",
     "serve": "node dist/src/cli.js serve",
