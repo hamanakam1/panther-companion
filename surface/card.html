@@ -26,7 +26,7 @@
   .goal .edit { margin-top: 6px; }
   .goal input { background: #0b0c10; border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 4px 8px; width: 100%; max-width: 260px; font: inherit; }
   .goal .hint { color: var(--muted); font-size: 11px; margin-top: 4px; }
-  .empty { color: var(--muted); font-size: 13px; padding-top: 30px; text-align: center; }
+  .empty { color: var(--muted); font-size: 13px; padding: 40px 16px; text-align: center; line-height: 1.6; }
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; display: none; }
   .card.shown { display: block; }
   .card .head { display: flex; align-items: baseline; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
@@ -62,9 +62,9 @@
     <div class="version" id="app-version">v1.0.0</div>
     <div style="flex:1"></div>
     <div class="mode">
-      <button id="mode-explain" class="active" onclick="setMode('explain')">Explain this</button>
-      <button id="mode-follow" onclick="setMode('follow')">Follow this task</button>
-      <button id="mode-prepare" onclick="setMode('prepare')">Prepare decision</button>
+      <button id="mode-explain" class="active" onclick="app.setMode('explain')">Explain this</button>
+      <button id="mode-follow" onclick="app.setMode('follow')">Follow this task</button>
+      <button id="mode-prepare" onclick="app.setMode('prepare')">Prepare decision</button>
     </div>
   </div>
   <main>
