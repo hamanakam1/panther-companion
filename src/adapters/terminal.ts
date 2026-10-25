@@ -15,7 +15,8 @@ import { Adapter, observationSummary } from "./adapter.js";
  * it has read up to and only returns new lines on subsequent captures, so a
  * long-running host can poll for live terminal events.
  *
- * Set PANTHER_TERMINAL_LOG to a JSONL path, or pipe events into stdin.
+ * Set PANTHER_TERMINAL_LOG to a JSONL path. Events can also be pushed
+ * programmatically via inject(), or piped via the explicit captureStdin() call.
  * Use inject() to push events programmatically.
  */
 export class TerminalAdapter extends Adapter {
@@ -33,13 +34,21 @@ export class TerminalAdapter extends Adapter {
 
   async capture(options?: IngestOptions): Promise<Observation[]> {
     const now = options?.now ?? new Date().toISOString();
-    const events = this.logPath ? this.readNewFileEvents() : await this.readStdinEvents();
+    if (!this.logPath) return [];
+    const events = this.readNewFileEvents();
     return events.map((event) => this.eventToObservation(event, now));
   }
 
   /** Push a terminal event programmatically (live capture integration). */
   inject(event: Record<string, unknown>, now?: string): Observation {
     return this.eventToObservation(event, now ?? new Date().toISOString());
+  }
+
+  /** Capture from stdin explicitly (caller pipes JSONL events into stdin). */
+  async captureStdin(): Promise<Observation[]> {
+    const now = new Date().toISOString();
+    const events = await this.readStdinEvents();
+    return events.map((event) => this.eventToObservation(event, now));
   }
 
   /** Start watching the log file for changes. Caller must call stopWatcher(). */

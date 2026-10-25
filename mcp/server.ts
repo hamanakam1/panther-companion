@@ -2,17 +2,15 @@
 /**
  * panther-mcp — minimal stdio MCP server for Panther Companion.
  *
- * Exposes:
- *   panther.get_goal        — read the current goal hypothesis
- *   panther.status          — live card, gate, insight counts
- *   panther.explain         — run one-shot explain now
- *   panther.feed_observation— an external tool pushes one structured observation
- *   panther.feedback        — record user feedback (AlreadyKnow | WrongTask | …)
- *
  * Implements the MCP stdio JSON-RPC subset directly (no SDK dependency) so the
- * companion stays dependency-light. Other tools (Claude, Cursor, Codex) can
- * read the current goal or feed observations into the same reasoning core the
- * desktop surface uses.
+ * companion stays dependency-light:
+ *   - initialize / notifications / ping
+ *   - tools/list
+ *   - tools/call  -> panther_get_goal, panther_status, panther_explain,
+ *                    panther_feed_observation, panther_feedback
+ *
+ * Other tools (Claude, Cursor, Codex, ...) can read the current goal or feed
+ * observations into the same reasoning core the desktop surface uses.
  */
 import { Store } from "../src/state/store.js";
 import { Panther } from "../src/ingest.js";
@@ -47,6 +45,14 @@ function errorResponse(id: Request["id"], code: number, message: string): Respon
   return { jsonrpc: "2.0", id, error: { code, message } };
 }
 
+const TOOLS: Array<{ name: string; description: string; inputSchema: { type: string; properties?: Record<string, unknown>; required?: string[] } }> = [
+  { name: "panther_get_goal", description: "Read the current goal hypothesis", inputSchema: { type: "object", properties: {} } },
+  { name: "panther_status", description: "Live card, gate, insight counts", inputSchema: { type: "object", properties: {} } },
+  { name: "panther_explain", description: "Run one-shot explain now against captured evidence", inputSchema: { type: "object", properties: { onRequest: { type: "boolean" } } } },
+  { name: "panther_feed_observation", description: "An external tool pushes one structured observation", inputSchema: { type: "object", properties: { providerId: { type: "string" }, label: { type: "string" }, locator: { type: "string" }, summary: { type: "string" }, payload: { type: "object" } }, required: ["providerId", "label"] } },
+  { name: "panther_feedback", description: "Record user feedback (AlreadyKnow | WrongTask | UsefulMoreLikeThis | ExplainMechanism | UsefulButLater)", inputSchema: { type: "object", properties: { kind: { type: "string" }, insightId: { type: "string" }, topic: { type: "string" } }, required: ["kind"] } },
+];
+
 const handlers: Record<string, (params?: Record<string, unknown>) => Promise<unknown>> = {
   async panther_get_goal() {
     return panther.store.getGoal(nowIso());
@@ -56,7 +62,7 @@ const handlers: Record<string, (params?: Record<string, unknown>) => Promise<unk
     return { goal: panther.store.getGoal(nowIso()), live: live ?? null, sources: panther.sources(), counts: panther.store.countInsights() };
   },
   async panther_explain(params) {
-    const onRequest = params?.onRequest !== false;
+    const onRequest = (params?.onRequest as boolean | undefined) !== false;
     const result = await panther.explain({ onRequest, now: nowIso() });
     return { ...result, live: result.live ?? null };
   },
@@ -71,7 +77,7 @@ const handlers: Record<string, (params?: Record<string, unknown>) => Promise<unk
       label: String(params.label),
       locator: String(params.locator ?? ""),
       summary: String(params.summary ?? String(params.label)),
-      payload: params.payload ?? {},
+      payload: (params.payload as Record<string, unknown>) ?? {},
       signature: String(params.signature ?? `${params.providerId}:${params.label}`),
     };
     panther.store.insertObservation(obs);
@@ -93,7 +99,7 @@ process.stdin.on("data", (chunk) => {
     const line = buffer.slice(0, idx).trim();
     buffer = buffer.slice(idx + 1);
     if (!line) continue;
-    handleLine(line);
+    void handleLine(line);
   }
 });
 
@@ -105,11 +111,41 @@ async function handleLine(line: string) {
     process.stdout.write(JSON.stringify(errorResponse(null, -32700, "parse error")) + "\n");
     return;
   }
+  if (request.method.startsWith("notifications/")) {
+    return; // notifications never get responses
+  }
+  if (request.method === "notifications/initialized") {
+    return;
+  }
   let result: unknown;
   try {
-    const handler = handlers[request.method];
-    if (!handler) throw new Error(`method not found: ${request.method}`);
-    result = await handler(request.params);
+    if (request.method === "initialize") {
+      result = {
+        protocolVersion: "2024-11-05",
+        capabilities: { tools: { listChanged: false } },
+        serverInfo: { name: "panther-companion", version: "0.1.0" },
+      };
+    } else if (request.method === "ping") {
+      result = {};
+    } else if (request.method === "tools/list") {
+      result = { tools: TOOLS };
+    } else if (request.method === "tools/call") {
+      const name = typeof request.params?.name === "string" ? request.params.name : "";
+      const args = (request.params?.arguments ?? {}) as Record<string, unknown>;
+      const handler = handlers[name];
+      if (!handler) {
+        process.stdout.write(JSON.stringify(errorResponse(request.id, -32602, `unknown tool: ${name}`)) + "\n");
+        return;
+      }
+      try {
+        const value = await handler(args);
+        result = { content: [{ type: "text", text: JSON.stringify(value) }], isError: false };
+      } catch (err) {
+        result = { content: [{ type: "text", text: String(err) }], isError: true };
+      }
+    } else {
+      throw new Error(`method not found: ${request.method}`);
+    }
   } catch (err) {
     process.stdout.write(JSON.stringify(errorResponse(request.id, -32603, String(err))) + "\n");
     return;
