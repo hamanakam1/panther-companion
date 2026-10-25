@@ -119,4 +119,6 @@ npm run eval
 
 Tests use in-memory or temporary SQLite stores and synthetic evidence. They cover card persistence, repeated imports, goal isolation, authority validation, pause/delete races, multi-host revision fences, JSONL bursts, local HTTP protections and display geometry. The five-situation evaluation covers command failures, source disagreement, shared agent failures, interrupted tasks and quiet routine success. Browser/native deployment verification is separate from these automated tests.
 
+GitHub Actions runs the locked install, build, tests and evaluation on the latest Node 22.x and 24.x releases for each pull request and changes to `main`. The workflow skips the Electron binary download because these checks use Node APIs and pure layout calculations. Native Electron interaction, desktop placement and browser capture still need their separate runtime checks.
+
 MIT licensed.
