@@ -1,0 +1,26 @@
+{
+  "name": "panther-companion",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first companion that explains current evidence for the current goal, and stays quiet otherwise.",
+  "bin": {
+    "panther": "dist/src/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/test/",
+    "eval": "npm run build && node dist/eval/run.js",
+    "serve": "node dist/src/cli.js serve",
+    "start": "npm run build && node dist/src/cli.js serve",
+    "explain": "npm run build && node dist/src/cli.js explain",
+    "panther": "node dist/src/cli.js"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panther Companion — Explain</title>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --bg: #0b0c10; --card: #111318; --border: #2a2f3a; --text: #e8eaed;
+    --muted: #94a3b8; --accent: #38bdf8; --ok: #4ade80; --warn: #fbbf24;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; }
+  #root { height: 100%; display: grid; grid-template-rows: 44px 1fr 40px; overflow: hidden; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 0 10px; border-bottom: 1px solid var(--border); background: #0f1116; }
+  .bar .brand { font-weight: 700; letter-spacing: 0.4px; font-size: 12px; }
+  .bar .mode { margin-left: auto; display: flex; gap: 6px; }
+  .bar button { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 4px 9px; border-radius: 5px; font-size: 11px; cursor: pointer; }
+  .bar button.active { border-color: var(--accent); color: var(--accent); }
+  .bar button:hover { background: #171a24; }
+  main { overflow-y: auto; padding: 14px 16px; display: grid; gap: 12px; }
+  .goal { background: #0f1116; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .goal .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; }
+  .goal h1 { margin: 0; font-size: 15px; font-weight: 600; }
+  .goal .edit { margin-top: 6px; }
+  .goal input { background: #0b0c10; border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 4px 8px; width: 260px; font: inherit; }
+  .goal .hint { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  .empty { color: var(--muted); font-size: 13px; padding-top: 30px; text-align: center; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; display: none; }
+  .card.shown { display: block; }
+  .card .head { display: flex; align-items: baseline; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .card .head .tag { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--accent); font-weight: 700; }
+  .card .head .using { margin-left: auto; color: var(--muted); font-size: 11px; }
+  .card .head .using b { color: var(--text); }
+  .section { padding: 10px 12px; }
+  .section + .section { border-top: 1px solid #1c202b; }
+  .section .title { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 6px; font-weight: 700; }
+  .section p { margin: 0 0 4px 0; color: var(--text); font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
+  .section p.none { color: var(--muted); font-style: italic; }
+  .evidence { display: grid; gap: 6px; }
+  .evidence .item { background: #0b0c10; border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; font-size: 12px; }
+  .evidence .item .prov { color: var(--accent); font-weight: 700; font-size: 11px; margin-bottom: 2px; }
+  .evidence .item .loc { color: var(--muted); font-size: 11px; margin-top: 3px; }
+  ul { margin: 0; padding-left: 16px; color: var(--text); }
+  li { margin: 2px 0; font-size: 13px; line-height: 1.5; }
+  .gate { padding: 8px 12px; color: var(--muted); font-size: 11.5px; border-top: 1px solid #1c202b; }
+  .gate b { color: var(--text); }
+  footer { border-top: 1px solid var(--border); display: flex; gap: 8px; padding: 7px 12px; background: #0f1116; font-size: 11px; color: var(--muted); }
+  footer button { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 4px 9px; cursor: pointer; font-size: 11px; }
+  footer button.active { border-color: var(--ok); color: var(--ok); }
+  footer button:hover { background: #171a24; }
+  footer .flex { margin-left: auto; display: flex; gap: 6px; }
+  .badge { display: inline-block; border: 1px solid var(--border); border-radius: 9px; padding: 1px 7px; font-size: 10px; color: var(--muted); margin-right: 6px; }
+  .badge.ok { border-color: var(--ok); color: var(--ok); }
+  .badge.warn { border-color: var(--warn); color: var(--warn); }
+  .hidden { display: none !important; }
+</style>
+<div id="root">
+  <div class="bar">
+    <div class="brand">panther</div>
+    <div style="flex:1"></div>
+    <div class="mode">
+      <button id="mode-explain" class="active" onclick="setMode('explain')">Explain this</button>
+      <button id="mode-follow" onclick="setMode('follow')">Follow this task</button>
+      <button id="mode-prepare" onclick="setMode('prepare')">Prepare decision</button>
+    </div>
+  </div>
+  <main>
+    <section class="goal">
+      <div class="label">Current goal</div>
+      <h1 id="goal-text">—</h1>
+      <div class="edit">
+        <input id="goal-input" placeholder="Type a goal hypothesis and press Enter">
+        <div class="hint">Enter to set • <button onclick="app.editGoal()">edit</button> • <button onclick="app.wrongTask()">Wrong task</button></div>
+      </div>
+    </section>
+    <div id="empty" class="empty">Panther is quiet. Capture a terminal command or focused browser tab, then press <b>Explain this</b>.</div>
+    <div id="card" class="card">
+      <div class="head">
+        <span class="tag" id="card-topic">—</span>
+        <span class="using">Using: <b id="card-using">—</b></span>
+      </div>
+      <div class="section">
+        <div class="title">What it means</div>
+        <p id="s-what" class="none">—</p>
+      </div>
+      <div class="section">
+        <div class="title">Why it matters here</div>
+        <p id="s-why" class="none">—</p>
+      </div>
+      <div class="section">
+        <div class="title">Next check</div>
+        <p id="s-next" class="none">—</p>
+      </div>
+      <div class="section">
+        <div class="title">Evidence <span class="badge" id="evidence-count">0</span></div>
+        <div class="evidence" id="evidence-list"></div>
+      </div>
+      <div class="section">
+        <div class="title">Observed / Inferred / Unknown</div>
+        <p><b>Observed:</b> <span id="s-observed" class="none">—</span></p>
+        <p><b>Inferred:</b> <span id="s-inferred" class="none">—</span></p>
+        <p><b>Unknown:</b> <span id="s-unknown" class="none">—</span></p>
+      </div>
+      <div class="gate">
+        <span id="gate-reason">gate: —</span>
+      </div>
+    </div>
+  </main>
+  <footer>
+    <span id="footer-mode">mode: explain</span>
+    <div class="flex">
+      <button onclick="app.feedback('AlreadyKnow')">Already know</button>
+      <button onclick="app.feedback('WrongTask')">Wrong task</button>
+      <button onclick="app.feedback('UsefulMoreLikeThis')">More like this</button>
+      <button onclick="app.feedback('ExplainMechanism')">Explain mechanism</button>
+      <button onclick="app.feedback('UsefulButLater')">Useful but later</button>
+      <button onclick="app.refresh()">Refresh</button>
+    </div>
+  </footer>
+</div>
+<script>
+const BASE = "";
+let app = null;
+
+async function json(path, opts = {}) {
+  const res = await fetch(path, { headers: { "content-type": "application/json" }, ...opts });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+class App {
+  constructor() {
+    this.mode = "explain";
+    this.live = null;
+    this.goal = null;
+    this.refreshInterval = null;
+    this.bind();
+    this.refresh();
+    this.refreshInterval = setInterval(() => this.refresh(), 4000);
+  }
+  bind() {
+    document.getElementById("goal-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); this.setGoal(); }
+    });
+  }
+  setMode(m) {
+    this.mode = m;
+    for (const b of document.querySelectorAll(".bar button")) b.classList.remove("active");
+    document.getElementById(`mode-${m}`).classList.add("active");
+    document.getElementById("footer-mode").textContent = "mode: " + m;
+    this.refresh();
+  }
+  async setGoal() {
+    const input = document.getElementById("goal-input");
+    const hypothesis = input.value.trim();
+    if (!hypothesis) return;
+    await json("/api/goal", { method: "POST", body: JSON.stringify({ hypothesis }) });
+    input.value = "";
+    this.refresh();
+  }
+  async editGoal() {
+    const input = document.getElementById("goal-input");
+    input.focus();
+  }
+  async wrongTask() {
+    await json("/api/feedback", { method: "POST", body: JSON.stringify({ kind: "WrongTask", insightId: this.live ? this.live.insightId : null, topic: this.live ? this.live.explanation.topic : null }) });
+    this.refresh();
+  }
+  async feedback(kind) {
+    await json("/api/feedback", { method: "POST", body: JSON.stringify({ kind, insightId: this.live ? this.live.insightId : null, topic: this.live ? this.live.explanation.topic : null }) });
+    this.refresh();
+  }
+  async refresh() {
+    try {
+      const status = await json("/api/status");
+      this.goal = status.goal;
+      this.renderGoal();
+      if (status.live) {
+        this.live = status.live;
+        this.renderCard(this.live);
+      } else {
+        document.getElementById("empty").classList.remove("hidden");
+        document.getElementById("card").classList.remove("shown");
+      }
+    } catch (err) {
+      document.getElementById("empty").textContent = "panther server not reachable: " + err.message;
+    }
+  }
+  renderGoal() {
+    const g = this.goal;
+    const el = document.getElementById("goal-text");
+    const input = document.getElementById("goal-input");
+    if (g && g.hypothesis && g.hypothesis !== "Goal not set") {
+      el.textContent = g.hypothesis;
+      input.placeholder = g.hypothesis;
+    } else {
+      el.textContent = "No goal set";
+      input.placeholder = "Set a goal hypothesis…";
+    }
+  }
+  renderCard(live) {
+    document.getElementById("empty").classList.add("hidden");
+    const card = document.getElementById("card");
+    card.classList.add("shown");
+    const e = live.explanation;
+    document.getElementById("card-topic").textContent = e.topic;
+    document.getElementById("card-using").textContent = (live.using || []).join(", ") || "—";
+    document.getElementById("s-what").textContent = e.whatItMeans || "—";
+    document.getElementById("s-what").className = e.whatItMeans ? "" : "none";
+    document.getElementById("s-why").textContent = e.whyItMattersHere || "—";
+    document.getElementById("s-why").className = e.whyItMattersHere ? "" : "none";
+    document.getElementById("s-next").textContent = e.nextCheck || "—";
+    document.getElementById("s-next").className = e.nextCheck ? "" : "none";
+    document.getElementById("gate-reason").textContent = "gate: " + (live.reasoning || "—");
+    document.getElementById("evidence-count").textContent = String(e.evidence ? e.evidence.length : 0);
+    const list = document.getElementById("evidence-list");
+    list.innerHTML = "";
+    for (const ref of (e.evidence || [])) {
+      const div = document.createElement("div");
+      div.className = "item";
+      div.innerHTML = `<div class="prov">${ref.providerId}</div><div>${ref.label}</div><div class="loc">${ref.locator}</div>`;
+      list.appendChild(div);
+    }
+    const renderList = (id, items) => {
+      const el = document.getElementById(id);
+      if (!items || items.length === 0) { el.textContent = "—"; el.className = "none"; return; }
+      el.className = "";
+      el.innerHTML = items.map((t) => `<li>${escapeHtml(t)}</li>`).join("");
+    };
+    renderList("s-observed", e.observed);
+    renderList("s-inferred", e.inferred);
+    renderList("s-unknown", e.unknown);
+    // mode badges
+    for (const b of document.querySelectorAll("footer button")) b.classList.remove("active");
+    document.getElementById("footer-mode").textContent = "mode: " + this.mode;
+  }
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[c]); }
+
+document.addEventListener("DOMContentLoaded", () => { app = new App(); });
+
+</script>
+</html>
