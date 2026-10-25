@@ -26,7 +26,10 @@
   .goal .edit { margin-top: 6px; }
   .goal input { background: #0b0c10; border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 4px 8px; width: 100%; max-width: 260px; font: inherit; }
   .goal .hint { color: var(--muted); font-size: 11px; margin-top: 4px; }
-  .empty { color: var(--muted); font-size: 13px; padding: 40px 16px; text-align: center; line-height: 1.6; }
+  .empty { color: var(--muted); font-size: 13px; padding: 28px 16px; text-align: center; line-height: 1.6; border: 1px dashed var(--border); border-radius: 8px; background: #0f1116; }
+  .notice { color: var(--ok); font-size: 11px; padding: 0 8px; white-space: nowrap; }
+  .notice.hidden { display: none; }
+  footer { border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: #0f1116; font-size: 11px; color: var(--muted); -webkit-app-region: no-drag; }
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; display: none; }
   .card.shown { display: block; }
   .card .head { display: flex; align-items: baseline; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
@@ -111,6 +114,7 @@
   </main>
   <footer>
     <span id="footer-mode">mode: explain</span>
+    <span id="notice" class="notice hidden"></span>
     <div class="flex">
       <button onclick="app.feedback('AlreadyKnow')">Already know</button>
       <button onclick="app.feedback('WrongTask')">Wrong task</button>
@@ -166,6 +170,7 @@ class App {
     this.goal = null;
     this.refreshInterval = null;
     this.ipcUnsubscribe = null;
+    this._noticeTimer = null;
     this.bind();
     this.refresh();
     this.refreshInterval = setInterval(() => this.refresh(), 4000);
@@ -197,8 +202,18 @@ class App {
       document.getElementById("empty").classList.add("hidden");
       document.getElementById("card").classList.add("shown");
     } else {
-      document.getElementById("empty").classList.remove("hidden");
+      this.live = null;
       document.getElementById("card").classList.remove("shown");
+      const empty = document.getElementById("empty");
+      empty.classList.remove("hidden");
+      const hypothesis = (this.goal && this.goal.hypothesis && this.goal.hypothesis !== "Goal not set")
+        ? this.goal.hypothesis : "";
+      if (hypothesis) {
+        empty.innerHTML = '<b style="color:var(--text)">Goal set.</b> ' + escapeHtml(hypothesis) +
+          '<br><br>Capture a terminal command (or focus a browser tab), then press <b>Explain this</b>.';
+      } else {
+        empty.innerHTML = 'No goal set yet. Type a goal hypothesis above, then capture a command and press <b>Explain this</b>.';
+      }
     }
   }
   async refresh() {
@@ -229,6 +244,7 @@ class App {
     if (!hypothesis) return;
     await tSetGoal(hypothesis);
     input.value = "";
+    await this.showNotice("Goal set: " + hypothesis);
     this.refresh();
   }
   async editGoal() {
@@ -237,11 +253,21 @@ class App {
   }
   async wrongTask() {
     await tFeedback("WrongTask", this.live ? this.live.insightId : null, this.live ? this.live.explanation.topic : null);
+    await this.showNotice("Recorded: wrong task. Goal marked for correction.");
     this.refresh();
   }
   async feedback(kind) {
     await tFeedback(kind, this.live ? this.live.insightId : null, this.live ? this.live.explanation.topic : null);
+    await this.showNotice("Feedback recorded (" + kind + ").");
     this.refresh();
+  }
+  async showNotice(text) {
+    const n = document.getElementById("notice");
+    if (!n) return;
+    n.textContent = text;
+    n.classList.remove("hidden");
+    if (this._noticeTimer) clearTimeout(this._noticeTimer);
+    this._noticeTimer = setTimeout(() => n.classList.add("hidden"), 1600);
   }
   renderGoal() {
     const g = this.goal;
