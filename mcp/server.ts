@@ -33,11 +33,17 @@ const dbPath = process.env.PANTHER_DB ?? DEFAULT_DB;
 // another surface owns it, attach read-only and refuse the tools that write,
 // naming the owner, instead of racing it for the file.
 const claim = claimWriter(dbPath, "panther-mcp");
-const store = Store.open(dbPath, { readOnly: !claim.owned });
+const store = Store.open(dbPath, { writer: claim, readOnly: !claim.owned });
 const readOnlyReason = claim.owned
   ? null
   : `The Panther store is being written by ${claim.holder ? describeHolder(claim.holder) : "another surface"}. Reading still works; recording does not until that surface quits.`;
-process.on("exit", () => claim.release());
+let resourcesClosed = false;
+function closeResources() {
+  if (resourcesClosed) return;
+  resourcesClosed = true;
+  try { store.close(); } finally { claim.release(); }
+}
+process.on("exit", closeResources);
 const adapters = [new TerminalAdapter(), new BrowserAdapter(), new AgentEventAdapter()];
 const reasoner = config.reasoning.provider === "ollama"
   ? new OllamaReasoner(config.reasoning.ollamaUrl, config.reasoning.model, { fallbackToLocal: config.reasoning.fallbackToLocal })
@@ -105,26 +111,56 @@ const handlers: Record<string, (params?: Record<string, unknown>) => Promise<unk
 };
 
 let buffer = "";
+const pending = new Set<Promise<void>>();
+let finishing = false;
+let exitCode = 0;
+
+function acceptLine(line: string) {
+  const task = handleLine(line).catch(() => {
+    exitCode = 1;
+    process.stderr.write("MCP request failed unexpectedly.\n");
+  });
+  pending.add(task);
+  void task.then(() => pending.delete(task));
+}
+
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => {
+  if (finishing) return;
   buffer += chunk;
   let idx: number;
   while ((idx = buffer.indexOf("\n")) !== -1) {
     const line = buffer.slice(0, idx).trim();
     buffer = buffer.slice(idx + 1);
     if (!line) continue;
-    void handleLine(line);
+    acceptLine(line);
   }
 });
 
 async function handleLine(line: string) {
-  let request: Request;
+  let parsed: unknown;
   try {
-    request = JSON.parse(line);
+    parsed = JSON.parse(line);
   } catch {
     process.stdout.write(JSON.stringify(errorResponse(null, -32700, "parse error")) + "\n");
     return;
   }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    process.stdout.write(JSON.stringify(errorResponse(null, -32600, "invalid request")) + "\n");
+    return;
+  }
+  const envelope = parsed as Record<string, unknown>;
+  const hasId = Object.hasOwn(envelope, "id");
+  const validId = envelope.id === null || (typeof envelope.id === "string" && envelope.id.length <= 200)
+    || (typeof envelope.id === "number" && Number.isFinite(envelope.id));
+  if (envelope.jsonrpc !== "2.0" || typeof envelope.method !== "string" || !envelope.method || envelope.method.length > 200
+    || (hasId && !validId) || (envelope.params !== undefined && (!envelope.params || typeof envelope.params !== "object" || Array.isArray(envelope.params)))) {
+    process.stdout.write(JSON.stringify(errorResponse(hasId && validId ? envelope.id as Request["id"] : null, -32600, "invalid request")) + "\n");
+    return;
+  }
+  // Notifications never receive a response or invoke request-only tool routes.
+  if (!hasId) return;
+  const request = envelope as Request;
   if (request.method.startsWith("notifications/")) {
     return; // notifications never get responses
   }
@@ -171,12 +207,51 @@ async function handleLine(line: string) {
   process.stdout.write(JSON.stringify(respond(request.id, result)) + "\n");
 }
 
-// A stdio client normally closes the pipe right after its last request. Exiting
-// immediately discards a pending stdout write, so the final answer would be cut
-// mid-line. Wait for the write to drain, then release the lease.
-function finish() {
-  claim.release();
-  process.stdout.write("", () => process.exit(0));
+function exit(code: number): never {
+  try { closeResources(); } catch {
+    code = 1;
+    process.stderr.write("MCP store shutdown failed.\n");
+  }
+  process.exit(code);
 }
-process.stdin.on("end", finish);
-process.stdin.on("error", finish);
+
+// EOF closes admission, not accepted work. Keep writer ownership through all
+// handlers and the final stdout flush; only then close SQLite and the claim.
+// The grace period exceeds the reasoner's existing 60-second request timeout.
+function finish(code = 0, acceptTail = false) {
+  if (code) exitCode = code;
+  if (finishing) return;
+  if (acceptTail && buffer.trim()) acceptLine(buffer.trim());
+  buffer = "";
+  finishing = true;
+  process.stdin.pause();
+  const deadline = setTimeout(() => {
+    process.stderr.write("MCP shutdown timed out while draining accepted requests or output; completion is unconfirmed.\n");
+    exit(1);
+  }, 65_000);
+  void Promise.allSettled([...pending]).then(() => {
+    const flushDeadline = setTimeout(() => {
+      process.stderr.write("MCP output did not drain; response delivery is unconfirmed.\n");
+      exit(1);
+    }, 5_000);
+    process.stdout.write("", error => {
+      if (error) {
+        process.stderr.write("MCP output failed; response delivery is unconfirmed.\n");
+        exit(1);
+      }
+      clearTimeout(deadline); clearTimeout(flushDeadline);
+      exit(exitCode);
+    });
+  });
+}
+process.stdin.on("end", () => finish(0, true));
+process.stdin.on("error", () => {
+  process.stderr.write("MCP input failed; draining accepted requests.\n");
+  finish(1);
+});
+process.stdout.on("error", () => {
+  process.stderr.write("MCP output failed; response delivery is unconfirmed.\n");
+  exit(1);
+});
+process.on("SIGTERM", () => finish(143));
+process.on("SIGINT", () => finish(130));
