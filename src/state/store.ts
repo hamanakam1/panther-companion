@@ -95,16 +95,33 @@ CREATE TABLE IF NOT EXISTS insight_goals (insight_id TEXT PRIMARY KEY, goal_id T
 
 export class Store {
   private transactionActive = false;
-  constructor(private readonly db: DatabaseSync) {
-    this.db.exec("PRAGMA journal_mode = WAL;");
+  constructor(private readonly db: DatabaseSync, readonly readOnly = false) {
     this.db.exec("PRAGMA foreign_keys = ON;");
     this.db.exec("PRAGMA busy_timeout = 5000;");
-    this.db.exec(SCHEMA);
+    // A read-only connection cannot set the journal mode or create tables, and
+    // must not try: it attaches to a store another process is already writing.
+    if (!readOnly) {
+      this.db.exec("PRAGMA journal_mode = WAL;");
+      this.db.exec(SCHEMA);
+    }
   }
 
-  static open(path: string): Store {
+  /**
+   * `readOnly` attaches without any write, for a surface that lost the writer
+   * lease. Writes then fail at SQLite, which is the point: the owner is the
+   * only writer.
+   */
+  static open(path: string, options: { readOnly?: boolean } = {}): Store {
     mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-    return new Store(new DatabaseSync(path));
+    const readOnly = options.readOnly === true;
+    if (!readOnly) return new Store(new DatabaseSync(path));
+    try {
+      return new Store(new DatabaseSync(path, { readOnly: true }), true);
+    } catch {
+      // Nothing to attach to yet: say so in terms the user can act on, rather
+      // than surfacing SQLite's "unable to open database file".
+      throw new Error(`Nothing to read at ${path}. Start the surface that owns the store first.`);
+    }
   }
 
   static memory(): Store {
@@ -119,6 +136,8 @@ export class Store {
     const stored = this.meta<Goal>("goal");
     if (stored) return stored;
     const goal = unsetGoal(now);
+    // Reading must not become a write on an attached read-only surface.
+    if (this.readOnly) return goal;
     this.saveGoal(goal);
     return goal;
   }
