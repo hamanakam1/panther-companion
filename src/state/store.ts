@@ -1,7 +1,6 @@
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
+import { claimWriter, type WriterClaim } from "./writer.js";
 import { defaultPreferences } from "../config.js";
 import type {
   Explanation,
@@ -95,7 +94,8 @@ CREATE TABLE IF NOT EXISTS insight_goals (insight_id TEXT PRIMARY KEY, goal_id T
 
 export class Store {
   private transactionActive = false;
-  constructor(private readonly db: DatabaseSync, readonly readOnly = false) {
+  private closed = false;
+  private constructor(private readonly db: DatabaseSync, readonly readOnly = false, private readonly writer?: WriterClaim) {
     this.db.exec("PRAGMA foreign_keys = ON;");
     this.db.exec("PRAGMA busy_timeout = 5000;");
     // A read-only connection cannot set the journal mode or create tables, and
@@ -111,17 +111,18 @@ export class Store {
    * lease. Writes then fail at SQLite, which is the point: the owner is the
    * only writer.
    */
-  static open(path: string, options: { readOnly?: boolean } = {}): Store {
-    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  static open(path: string, options: { readOnly?: boolean; writer?: WriterClaim; surface?: string } = {}): Store {
     const readOnly = options.readOnly === true;
-    if (!readOnly) return new Store(new DatabaseSync(path));
-    try {
-      return new Store(new DatabaseSync(path, { readOnly: true }), true);
-    } catch {
-      // Nothing to attach to yet: say so in terms the user can act on, rather
-      // than surfacing SQLite's "unable to open database file".
-      throw new Error(`Nothing to read at ${path}. Start the surface that owns the store first.`);
+    if (readOnly) {
+      let db: DatabaseSync | undefined;
+      try { db = new DatabaseSync(path, { readOnly: true }); return new Store(db, true); }
+      catch { db?.close(); throw new Error("No readable Companion state is available. Start Companion or set a goal first, then try again."); }
     }
+    const writer = options.writer ?? claimWriter(path, options.surface ?? "Panther Companion command");
+    writer.assertOwned(path);
+    let db: DatabaseSync | undefined;
+    try { db = new DatabaseSync(path); return new Store(db, false, writer); }
+    catch (error) { db?.close(); writer.release(); throw error; }
   }
 
   static memory(): Store {
@@ -129,7 +130,10 @@ export class Store {
   }
 
   close(): void {
+    if (this.closed) return;
     this.db.close();
+    this.closed = true;
+    this.writer?.release();
   }
 
   getGoal(now: string): Goal {

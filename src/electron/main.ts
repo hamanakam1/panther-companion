@@ -15,6 +15,7 @@ import { InputError } from "../bundle.js";
 import { createCompanionServer } from "../http.js";
 import { claimWriter, describeHolder } from "../state/writer.js";
 import { companionBounds } from "./layout.js";
+import { ownerCleanup } from "./owner.js";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -112,6 +113,7 @@ if (!app.requestSingleInstanceLock()) {
     process.once("SIGINT", () => shutdown("SIGINT"));
     const dbPath = process.env.PANTHER_DB ?? `${pantherHome()}/state.sqlite`;
     const port = Number(process.env.PANTHER_PORT || 8765);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("PANTHER_PORT must be a valid port.");
     // One process writes the store. If this panel gets it, it also serves the
     // browser surface from this same process — one controller, so the panel and
     // the browser cannot disagree about the goal, the card or the follow session.
@@ -133,13 +135,16 @@ if (!app.requestSingleInstanceLock()) {
       }
       createWindow();
     } else {
+      let store: Store | undefined;
+      let server: ReturnType<typeof createCompanionServer> | undefined;
+      teardown = ownerCleanup(() => ({ claim, store, controller, server }));
       try {
         const config = loadConfig(null);
-        const store = Store.open(dbPath);
+        store = Store.open(dbPath, { writer: claim });
         const reasoner = config.reasoning.provider === "ollama" ? new OllamaReasoner(config.reasoning.ollamaUrl, config.reasoning.model, { fallbackToLocal: config.reasoning.fallbackToLocal }) : new LocalReasoner();
         controller = new CompanionController(new Panther({ store, adapters: [new TerminalAdapter(), new BrowserAdapter(), new AgentEventAdapter()], reasoner, threshold: config.threshold, followMinutes: config.followMinutes, insightTtlMinutes: config.insightTtlMinutes }));
         controller.start();
-        const server = createCompanionServer(controller);
+        server = createCompanionServer(controller);
         server.on("error", error => note("companion-server-error", { message: error.message }));
         server.listen(port, "127.0.0.1", () => note("companion-serving", { url: `http://127.0.0.1:${port}` }));
         ipcMain.handle("panther:action", async (event, action: string, data: unknown) => {
@@ -147,11 +152,10 @@ if (!app.requestSingleInstanceLock()) {
           try { return await controller!.action(action, data); }
           catch (error) { throw new Error(error instanceof InputError ? error.message : "Companion could not finish this action. Saved evidence is retained."); }
         });
-        teardown = () => { claim.release(); controller?.stop(); store.close(); server.close(); };
         createWindow();
       } catch (error) {
         note("companion-owner-failed", { message: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
-        claim.release();
+        teardown();
         throw error;
       }
     }

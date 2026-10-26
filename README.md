@@ -25,17 +25,19 @@ The desktop window respects the chosen display's work area, including negative c
 
 ### One surface writes at a time
 
-The panel, `npm run serve` and the MCP server all share one store, so exactly one of them writes it. The panel claims the store and serves `http://127.0.0.1:8765` from its own process, which means the desktop panel and the browser page are the same controller and cannot disagree about the goal, the card or the follow session. If `serve` already owns the store, the panel opens as a client of that server instead of opening the store a second time.
+The panel, `npm run serve`, the MCP server, and mutating CLI commands share one store, so exactly one host writes it. The panel claims the store and serves `http://127.0.0.1:8765` from its own process, which means the desktop panel and the browser page use the same controller for the goal, card, and Follow session. If `serve` already owns the store, the panel opens as a client of that server instead of opening the store a second time.
 
-Whoever comes second reads instead of writing, and says so in plain words rather than failing as a lock timeout:
+MCP can attach read-only when another host owns the store. CLI `status` and `goal show` are always read-only; they do not initialize missing state. Mutating CLI commands, including `explain`, `prepare`, `follow`, `goal set`, `feedback`, and `serve`, refuse a second writer with recovery guidance:
 
 ```
-Panther Companion: the store ~/.panther-companion/state.sqlite is already in use by
-Panther Companion panel (PID 1234, since 2026-10-26T09:22:10.844Z).
-Only one surface writes at a time. Use the surface that already owns it, or quit it and start this one again.
+Another Companion surface owns this store: Panther Companion panel
+(PID 1234, since 2026-10-26T09:22:10.844Z).
+Use that surface, or quit it before trying again.
 ```
 
-The claim is a lease file next to the store (`state.sqlite.writer`) with a heartbeat. Quitting releases it, a dead process is reclaimed immediately, and one that stops beating is reclaimed after 30 seconds. The panel also appends start-up and shutdown events to `~/.panther-companion/panel.log`, because a double-clicked app has no terminal to print to.
+Write authority is a SQLite transaction held in a separate local arbitration file (`state.sqlite.writer-lock.sqlite`) until the writable store closes. A process crash releases the operating-system lock. The `state.sqlite.writer` JSON record names the owner and records a diagnostic heartbeat; an old heartbeat never allows another host to take over a live process. Do not delete arbitration files while a host may be running. A fresh writable launch creates its private data directory automatically.
+
+When upgrading from v1.2.1, quit the older desktop app or server before starting an updated writer. An updated host also refuses a live legacy JSON-only owner, regardless of heartbeat age. This preserves the existing owner's work while versions are mixed. The panel appends start-up and shutdown events to `~/.panther-companion/panel.log`, because a double-clicked app has no terminal to print to.
 
 ### Install as an app
 

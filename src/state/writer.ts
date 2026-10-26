@@ -1,154 +1,146 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-
-/**
- * One process owns the local store; everyone else reads it.
- *
- * WHY THIS EXISTS. The panel and `serve` (and the MCP server) each opened
- * `~/.panther-companion/state.sqlite` read/write. WAL plus a 5s busy_timeout
- * was the only thing standing between two controllers and one file, and two
- * controllers can also open two follow sessions and two cards against the same
- * goal. A lock timeout is the wrong failure: it arrives after the user has
- * already acted.
- *
- * The lease is an ordinary file next to the database holding the owner's pid,
- * a token and a heartbeat. It is not a substitute for SQLite's own locking —
- * it is a declaration made before the first write, so a second writer can be
- * told to stop in words instead of discovering the problem as an error.
- */
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 
 export interface WriterHolder {
-  /** Identity of the claim, so a stale owner can never delete its successor's lease. */
   token: string;
   pid: number;
   surface: string;
   startedAt: string;
   heartbeatAt: string;
+  protocol?: "sqlite-lock-v1";
 }
 
 export interface WriterClaim {
-  /** True when this process may write to the store. */
-  owned: boolean;
-  /** Who holds it when `owned` is false. */
-  holder: WriterHolder | null;
-  /** Give the lease up (no-op when we do not own it). */
+  readonly owned: boolean;
+  readonly holder: WriterHolder | null;
+  /** Refuse a released claim or a claim for a different store. */
+  assertOwned(dbPath: string): void;
+  /** Call only after closing the writable store and finishing accepted actions. */
   release(): void;
-  /** Rewrite the heartbeat now; called on an interval while owning. */
+  /** Diagnostic only. Heartbeat age never grants or removes write authority. */
   heartbeat(): void;
 }
 
-/** A claim that stops beating for this long is considered abandoned. */
-export const WRITER_STALE_MS = 30_000;
 const BEAT_MS = 10_000;
 
-export function writerLeasePath(dbPath: string): string {
-  return `${dbPath}.writer`;
+function canonicalPath(dbPath: string): string {
+  const absolute = resolve(dbPath);
+  return existsSync(absolute) ? realpathSync(absolute) : join(realpathSync(dirname(absolute)), basename(absolute));
 }
+
+export function writerLeasePath(dbPath: string): string { return `${dbPath}.writer`; }
 
 function readHolder(path: string): WriterHolder | null {
   try {
-    const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-    if (!parsed || typeof parsed !== "object") return null;
-    const candidate = parsed as Record<string, unknown>;
-    if (typeof candidate.pid !== "number" || typeof candidate.token !== "string") return null;
+    const candidate = JSON.parse(readFileSync(path, "utf8")) as Partial<WriterHolder>;
+    if (!candidate || !Number.isInteger(candidate.pid) || (candidate.pid ?? 0) <= 0 || typeof candidate.token !== "string") return null;
     return {
-      token: candidate.token,
-      pid: candidate.pid,
+      token: candidate.token, pid: candidate.pid!,
       surface: typeof candidate.surface === "string" ? candidate.surface : "unknown",
       startedAt: typeof candidate.startedAt === "string" ? candidate.startedAt : "",
       heartbeatAt: typeof candidate.heartbeatAt === "string" ? candidate.heartbeatAt : "",
+      ...(candidate.protocol === "sqlite-lock-v1" ? { protocol: candidate.protocol } : {}),
     };
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-/** Whether the recorded owner is gone: dead pid, or a heartbeat older than the stale window. */
-export function isHolderGone(holder: WriterHolder, now = Date.now()): boolean {
-  if (!isProcessAlive(holder.pid)) return true;
-  const beat = Date.parse(holder.heartbeatAt);
-  return !Number.isFinite(beat) || now - beat > WRITER_STALE_MS;
+/** Only process death is evidence of abandonment; a stalled live host remains the owner. */
+export function isHolderGone(holder: WriterHolder): boolean {
+  if (!Number.isInteger(holder.pid) || holder.pid <= 0) return true;
+  if (holder.pid === process.pid) return false;
+  try { process.kill(holder.pid, 0); return false; }
+  catch (error) { return (error as { code?: string }).code !== "EPERM"; }
 }
 
-function isProcessAlive(pid: number): boolean {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  if (pid === process.pid) return true;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    // EPERM means the process exists but belongs to someone else.
-    return (error as { code?: string }).code === "EPERM";
-  }
-}
-
-/** Describe a holder for a message the user can act on. */
 export function describeHolder(holder: WriterHolder): string {
   return `${holder.surface} (PID ${holder.pid}, since ${holder.startedAt || "an unknown time"})`;
 }
 
-function write(path: string, holder: WriterHolder): void {
-  // Rename is atomic, so a concurrent reader never sees half a lease.
+function writeMetadata(path: string, holder: WriterHolder): void {
   const scratch = `${path}.${holder.token}.tmp`;
-  writeFileSync(scratch, `${JSON.stringify(holder)}\n`, { mode: 0o600 });
-  renameSync(scratch, path);
+  try {
+    writeFileSync(scratch, `${JSON.stringify(holder)}\n`, { mode: 0o600 });
+    renameSync(scratch, path);
+  } finally { rmSync(scratch, { force: true }); }
+}
+
+function refused(holder: WriterHolder | null, reason?: string): WriterClaim {
+  return {
+    owned: false, holder,
+    assertOwned() { throw new Error(reason ?? `Another Companion surface owns this store${holder ? `: ${describeHolder(holder)}` : ""}. Use that surface, or quit it before trying again.`); },
+    release() {}, heartbeat() {},
+  };
 }
 
 /**
- * Try to become the writer. Returns a claim either way: when `owned` is false
- * the caller must treat the store as read-only and can use `holder` to explain
- * exactly which process is in the way.
+ * A separate SQLite file holds a BEGIN IMMEDIATE transaction for the entire
+ * writer lifetime. The operating system releases its lock when the process
+ * dies. No TTL, PID guess, metadata unlink or heartbeat can steal a live lock.
+ * The .writer JSON file names the owner for diagnostics; it is not authority.
+ * Never delete the arbitration database while a host may be running.
  */
 export function claimWriter(dbPath: string, surface: string, now = () => Date.now()): WriterClaim {
-  const path = writerLeasePath(dbPath);
-  const token = randomUUID();
-  const startedAt = new Date(now()).toISOString();
-  const mine = (): WriterHolder => ({ token, pid: process.pid, surface, startedAt, heartbeatAt: new Date(now()).toISOString() });
-
-  const take = (): boolean => {
-    try {
-      writeFileSync(path, `${JSON.stringify(mine())}\n`, { flag: "wx", mode: 0o600 });
-      return true;
-    } catch (error) {
-      if ((error as { code?: string }).code !== "EEXIST") throw error;
-      return false;
-    }
-  };
-
-  const existing = readHolder(path);
-  const reclaimable = existing === null || isHolderGone(existing, now());
-
-  if (!(take() || (reclaimable && (rmSync(path, { force: true }), take())))) {
-    const holder = readHolder(path);
-    return { owned: false, holder, release() {}, heartbeat() {} };
+  mkdirSync(dirname(resolve(dbPath)), { recursive: true, mode: 0o700 });
+  const canonical = canonicalPath(dbPath);
+  const metadataPath = writerLeasePath(canonical);
+  const lockPath = `${canonical}.writer-lock.sqlite`;
+  const lock = new DatabaseSync(lockPath);
+  try {
+    chmodSync(lockPath, 0o600);
+    lock.exec("PRAGMA busy_timeout = 0; BEGIN IMMEDIATE;");
+  } catch (error) {
+    lock.close();
+    const code = (error as { errcode?: number }).errcode;
+    if (code === 5 || code === 6) return refused(readHolder(metadataPath));
+    throw error;
   }
 
+  // A still-running pre-arbitration release has only the old JSON claim. Do
+  // not overlap it during an upgrade, even if its heartbeat is old.
+  const previous = readHolder(metadataPath);
+  if (!previous && existsSync(metadataPath)) {
+    lock.exec("ROLLBACK;"); lock.close();
+    return refused(null, "The existing Companion writer record cannot be verified. Quit older Companion hosts and review the .writer record before starting a new writer.");
+  }
+  if (previous && previous.protocol !== "sqlite-lock-v1" && !isHolderGone(previous)) {
+    lock.exec("ROLLBACK;"); lock.close();
+    return refused(previous);
+  }
+
+  const token = randomUUID();
+  const startedAt = new Date(now()).toISOString();
+  const mine = (): WriterHolder => ({ token, pid: process.pid, surface, startedAt, heartbeatAt: new Date(now()).toISOString(), protocol: "sqlite-lock-v1" });
+  try { writeMetadata(metadataPath, mine()); }
+  catch (error) { lock.exec("ROLLBACK;"); lock.close(); throw error; }
   let released = false;
-  let beating: NodeJS.Timeout | null = null;
   const heartbeat = () => {
     if (released) return;
-    const current = readHolder(path);
-    // Never resurrect a lease that was taken over while we were slow.
-    if (current && current.token !== token) { released = true; if (beating) clearInterval(beating); return; }
-    write(path, mine());
+    // Diagnostics failure cannot revoke the SQLite lock or crash a live host.
+    try { writeMetadata(metadataPath, mine()); } catch { /* keep authority until close */ }
   };
-  beating = setInterval(heartbeat, BEAT_MS);
-  beating.unref();
-  const release = () => {
-    if (released) return;
-    released = true;
-    if (beating) clearInterval(beating);
-    const current = readHolder(path);
-    if (current?.token === token) rmSync(path, { force: true });
+  const timer = setInterval(heartbeat, BEAT_MS);
+  timer.unref();
+  return {
+    get owned() { return !released; }, holder: null,
+    assertOwned(path) {
+      if (released || canonicalPath(path) !== canonical) throw new Error("This Companion writer claim is closed or belongs to another store.");
+    },
+    heartbeat,
+    release() {
+      if (released) return;
+      released = true; clearInterval(timer);
+      // Remove only our diagnostic record while the authoritative lock is
+      // still held. A successor cannot claim between this check and removal.
+      try { if (readHolder(metadataPath)?.token === token) rmSync(metadataPath, { force: true }); }
+      finally { try { lock.exec("ROLLBACK;"); } finally { lock.close(); } }
+    },
   };
-  return { owned: true, holder: null, release, heartbeat };
 }
 
-/**
- * Read the current owner without claiming. Used by read-only surfaces to name
- * the process they are waiting on.
- */
+/** Best-effort diagnostic identity only; claimWriter is the authority check. */
 export function currentWriter(dbPath: string): WriterHolder | null {
-  const holder = readHolder(writerLeasePath(dbPath));
-  return holder && !isHolderGone(holder) ? holder : null;
+  try { const holder = readHolder(writerLeasePath(canonicalPath(dbPath))); return holder && !isHolderGone(holder) ? holder : null; }
+  catch { return null; }
 }
