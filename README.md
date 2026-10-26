@@ -25,21 +25,23 @@ The desktop window respects the chosen display's work area, including negative c
 
 ## A useful first session
 
-1. **Edit goal** — state the outcome you want. A goal change clears the current card and ends follow. Earlier context stays in exported history, rather than becoming evidence for the new task.
+1. **Set your goal** — follow the highlighted Goal → Evidence → Next check guide and state the outcome you want. A goal change clears the current card and ends follow. Earlier context stays in exported history, rather than becoming evidence for the new task.
 2. **Attach evidence** — paste selected text or a command result that already happened. Terminal results have an explicit command and exit code. Companion never runs that command.
-3. **Explain this** — read one next check. Expand the card to inspect observed facts, unverified inferences, unknowns, and source references. Explanation state survives a refresh and expires after its configured lifetime.
+3. **Read the next check** — attaching evidence or importing a bundle already requests an explanation. Use **Explain again** for a fresh view of the selected context. Expand the card to inspect observed facts, unverified inferences, unknowns, and source references. Explanation state survives a refresh and expires after its configured lifetime.
 4. **Give feedback** — Useful, Already know, Wrong task, More detail, and Later adjust local preferences. Wrong task clears the card and asks you to edit the goal.
 5. **Pause** when you want quiet. No source is read and no new evidence is accepted while paused. Resume enables explicit actions; start Follow again if you want continuous updates.
 
+The interface distinguishes a missing goal, missing evidence, selected evidence ready to explain, a next check ready to read, paused work, and a lost connection with a Retry action. Follow is unavailable in the interface until a source is configured; manual evidence and imports still work independently. Terminal results require an explicit observed exit code, with no assumed failure.
+
 Routine successful commands remain quiet. Empty captures state that evidence is missing. The default reasoner uses deterministic local rules, so the basic workflow responds immediately without waiting for a model.
 
-When explaining retained evidence, the local reasoner uses the latest completed terminal result only within the same command, directory, branch and source location. Event timestamps take precedence over arrival order; equal timestamps use the host's stable input order. A result with missing context cannot replace one with known, different context. Earlier results remain in local history and exports. Current failures and source disagreements take precedence over imported proposals; **Prepare next decision** still presents the explicitly stored open questions.
+When explaining retained evidence, the local reasoner uses the latest completed terminal result only within the same command, directory, branch and source location. Event timestamps take precedence over arrival order; equal timestamps use the host's stable input order. A result with missing context cannot replace one with known, different context. Earlier results remain in local history and exports. Current failures and source disagreements take precedence over imported proposals; **Prepare a decision** still presents the explicitly stored open questions.
 
 For a selected note, a standalone `Next useful check:` or `Next step:` label brings your proposed action onto the card with explicit user-supplied attribution. The extracted check is bounded, remains unverified, and never overrides an observed command failure or source disagreement.
 
 ## Work with Panther Intent Capture
 
-In Intent Capture, review a captured workflow and **export its intent bundle JSON**. In Companion, choose **Import from Intent Capture**, select the file, inspect its source, goal and proposal count, then import it. Adopting the captured goal is a separate checkbox, off by default.
+In Intent Capture, review a captured workflow and **export its intent bundle JSON**. In Companion, choose **Import from Intent Capture**, then **Choose JSON file** or **Paste bundle JSON**. For paste, open the exported file as text and copy its full contents yourself; Companion never reads the clipboard automatically. Choose **Preview bundle** to inspect the source, captured goal, proposal count, and producer-reported evidence summaries. Preview adds nothing to local history. Choose **Import N proposals** to confirm. Adopting the captured goal is a separate checkbox, off by default. Editing the JSON, changing the input method, choosing a different file, or closing the dialog invalidates its preview and clears that choice. Invalid, oversized, or empty bundles provide a recovery step and cannot be confirmed.
 
 The importer supports the current `1.2` portable bundle and a bounded projection of its fields. It checks producer/schema identity, identifiers, URLs, text/list limits and strict authority booleans. It accepts at most 25 proposals in a 1 MiB request. It deliberately discards raw events, media and unrecognized fields; this is not a full general-purpose JSON Schema validator.
 
@@ -65,7 +67,7 @@ Example terminal event, one JSON object per newline:
 
 Other optional sources are `PANTHER_BROWSER_LOG` and `PANTHER_AGENT_LOG`. They read explicitly configured files; they do not observe the desktop automatically. Source status says configured or not configured. A configured file is not proof that a fresh event is available.
 
-Follow ends at its deadline or when you click **End follow**. A process restart never silently resumes it. Pausing also ends active polling; resuming does not restart follow. **Prepare next decision** is a one-shot brief at your explicit pause, not another background mode.
+Follow ends at its deadline or when you click **End follow**. Closing a browser tab does not stop the local HTTP service or its active Follow session; use **End follow** or **Pause** first when you want observation to stop. Quitting the desktop app stops its process. A process restart never silently resumes Follow. Pausing also ends active polling; resuming does not restart follow. **Prepare a decision** is a one-shot brief at your explicit pause, not another background mode.
 
 Run one host per database for predictable source ownership. Persisted state revisions and atomic SQLite writes prevent delayed reasoning in another host from restoring a card after a goal change, pause or deletion. JSONL read cursors belong to each running host and reset after restart; repeated source lines can be recorded again across restarts.
 
@@ -121,7 +123,7 @@ npm test
 npm run eval
 ```
 
-Tests use in-memory or temporary SQLite stores and synthetic evidence. They cover card persistence, repeated imports, goal isolation, authority validation, pause/delete races, multi-host revision fences, JSONL bursts, local HTTP protections and display geometry. The five-situation evaluation covers command failures, source disagreement, shared agent failures, interrupted tasks and quiet routine success. Browser/native deployment verification is separate from these automated tests.
+Tests use in-memory or temporary SQLite stores and synthetic evidence. Surface behavior tests run the shipped event handlers against a minimal DOM and the real controller, including file/paste preview, stale async results, goal consent, invalid input, and recovery; browser rendering remains a separate check. They cover card persistence, repeated imports, goal isolation, authority validation, pause/delete races, multi-host revision fences, JSONL bursts, local HTTP protections and display geometry. The five-situation evaluation covers command failures, source disagreement, shared agent failures, interrupted tasks and quiet routine success. Browser/native deployment verification is separate from these automated tests.
 
 GitHub Actions runs the locked install, build, tests and evaluation on the latest Node 22.x and 24.x releases for each pull request and changes to `main`. The workflow skips the Electron binary download because these checks use Node APIs and pure layout calculations. Native Electron interaction, desktop placement and browser capture still need their separate runtime checks.
 

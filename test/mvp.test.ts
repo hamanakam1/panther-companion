@@ -113,7 +113,7 @@ describe("Intent Capture interoperability",()=>{
 describe("local HTTP boundary",()=>{
   it("serves the surface, handles goal/evidence/status, rejects other origins and hostile hosts",async()=>{
     const{p,c}=make();const server=createCompanionServer(c);server.listen(0,"127.0.0.1");await once(server,"listening");const url=`http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-    try{const page=await fetch(url);assert.equal(page.status,200);assert.match(await page.text(),/Selected context/);assert.equal(page.headers.get("access-control-allow-origin"),null);
+    try{const page=await fetch(url);assert.equal(page.status,200);assert.match(await page.text(),/id="context-details"/);assert.equal(page.headers.get("access-control-allow-origin"),null);
       assert.equal(await new Promise(resolve=>{get(url,{headers:{"sec-fetch-site":"cross-site","sec-fetch-mode":"navigate","sec-fetch-dest":"document"}},response=>{response.resume();resolve(response.statusCode);});}),200);
       assert.equal((await fetch(url+"/api/status",{headers:{"sec-fetch-site":"cross-site","sec-fetch-mode":"navigate","sec-fetch-dest":"document"}})).status,403);
       const post=(path:string,body:unknown,headers:Record<string,string>={})=>fetch(url+path,{method:"POST",headers:{"content-type":"application/json",...headers},body:JSON.stringify(body)});

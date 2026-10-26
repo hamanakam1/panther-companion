@@ -6,25 +6,38 @@
 <title>Panther Companion</title>
 <style>
 :root{color-scheme:dark;--bg:#11171c;--panel:#1b252b;--line:#34434b;--muted:#a9bac1;--ink:#f1f6f4;--mint:#98e5c0;--amber:#e8c88c;--red:#ffb5ae;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink)}button,input,textarea,select{font:inherit}button{border:1px solid var(--line);border-radius:9px;padding:9px 13px;background:#25323a;color:var(--ink);cursor:pointer;transition:background .15s}button:hover{background:#334750}button:disabled{opacity:.5;cursor:wait}button.primary{background:var(--mint);border-color:var(--mint);color:#10251d;font-weight:650}button.ghost{background:transparent}button.small{padding:5px 9px;font-size:12px}button.danger{color:var(--red)}:focus-visible{outline:3px solid var(--mint);outline-offset:3px}input,textarea,select{color:var(--ink);border:1px solid var(--line);border-radius:8px;background:#111a20;padding:10px 12px;width:100%}textarea{resize:vertical;min-height:100px}input[type=checkbox]{width:auto}h1,h2,h3,p{margin:0}h1{font-size:21px;letter-spacing:-.5px}h2{font-size:18px;letter-spacing:-.3px}h3{font-size:14px}a{color:var(--mint)}header{padding:22px 26px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;background:#151e24}.mark{display:grid;place-items:center;width:37px;height:37px;background:var(--mint);color:#10251d;border-radius:12px;font-size:23px;font-weight:800}.eyebrow{font-size:10px;letter-spacing:1.8px;font-weight:700;text-transform:uppercase;color:var(--muted)}.version{font-variant-numeric:tabular-nums;letter-spacing:.6px;padding:1px 5px;margin-left:6px;border:1px solid var(--line);border-radius:5px;color:var(--mint);background:#111a20;font-weight:600;-webkit-user-select:text;user-select:text}header .spacer{flex:1}.status{display:flex;align-items:center;gap:6px;color:var(--mint);font-size:12px}.dot{width:6px;height:6px;background:currentColor;border-radius:50%}main{max-width:840px;margin:auto;padding:22px 26px 30px;display:grid;gap:18px}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.between{justify-content:space-between}.muted{color:var(--muted);font-size:13px}.panel{border:1px solid var(--line);border-radius:14px;padding:18px;background:var(--panel)}.goal{border-left:3px solid var(--mint)}#goal-text{font-size:19px;line-height:1.4;letter-spacing:-.25px;margin:10px 0 7px;overflow-wrap:anywhere}.stack{display:grid;gap:12px}.modes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.modes button{min-height:65px;text-align:left;padding:10px 12px;font-weight:600}.modes span{display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:3px}.modes button.primary span{color:#245641}.section-label{font-size:11px;text-transform:uppercase;letter-spacing:1.25px;color:var(--muted);margin-bottom:8px}#session-bar{font-size:12px;color:var(--mint);padding:0 2px}.next{padding:17px;border-radius:11px;background:#223c33;border:1px solid #476658;margin:16px 0}.next .section-label{color:#b3e8ca}#next-check{font-size:17px;line-height:1.5}.explanation{display:grid;gap:14px}.explanation p{overflow-wrap:anywhere}.empty{padding:28px 10px;text-align:center}.empty .symbol{font-size:32px;color:var(--mint);margin-bottom:10px}.empty p{max-width:400px;margin:10px auto;color:var(--muted)}details{border-top:1px solid var(--line);padding-top:12px;margin-top:14px}summary{cursor:pointer;font-size:13px;color:var(--muted)}ul{margin:8px 0 12px;padding-left:20px}li{margin:6px 0;overflow-wrap:anywhere}.knowledge{padding:13px 0;border-bottom:1px solid var(--line)}.knowledge:last-child{border:0}.knowledge h3{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mint)}.knowledge.inferred h3{color:var(--amber)}.knowledge.unknown h3{color:var(--muted)}.feedback{margin-top:16px;display:flex;flex-wrap:wrap;gap:6px}.feedback button{font-size:11px;padding:6px 9px}.notice{padding:10px 13px;border:1px solid #476658;background:#223c33;border-radius:9px;font-size:13px;overflow-wrap:anywhere}.notice.error{border-color:#7a4946;background:#392626;color:var(--red)}#notice:empty{display:none}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.evidence-item{padding:12px 0;border-bottom:1px solid var(--line)}.evidence-item:last-child{border:0}.evidence-item p{font-size:13px;overflow-wrap:anywhere;white-space:pre-wrap}.evidence-item .meta{font-size:11px;color:var(--muted);margin-bottom:5px}.footer{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;gap:10px}dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:24px;width:min(550px,calc(100% - 30px));max-height:90vh;overflow:auto}dialog::backdrop{background:#050a0dcc}dialog h2{margin-bottom:16px}label{display:block;font-size:13px}label input,label textarea,label select{margin-top:5px}.checkbox{display:flex;align-items:center;gap:8px}.checkbox input{margin:0}dialog .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}dialog .help{font-size:12px;color:var(--muted);margin-top:4px}.hidden,[hidden]{display:none!important}#evidence-summary{white-space:pre-wrap;max-height:180px;overflow:auto;font-size:13px}#status-text{white-space:nowrap}.chip{font-size:10px;padding:3px 7px;border:1px solid var(--line);border-radius:5px;color:var(--muted)}.error-state{color:var(--red)}@media(max-width:480px){header{padding:16px}main{padding:16px;gap:14px}.modes{grid-template-columns:1fr}.modes button{min-height:45px}.modes span{display:inline;margin-left:6px}#status-text{max-width:80px;white-space:normal}.footer{flex-wrap:wrap}.panel{padding:15px}}@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+.journey{display:flex;gap:8px;list-style:none;padding:0;margin:0 0 16px;flex-wrap:wrap}.journey li{margin:0;font-size:12px;color:var(--muted);padding:5px 9px;border:1px solid var(--line);border-radius:20px}.journey [aria-current=step]{background:#223c33;color:var(--mint);border-color:#476658}.guidance{margin:0 0 14px}.guidance h2{font-size:16px;margin-bottom:5px}.guidance p{font-size:13px;color:var(--muted)}.source-choice{display:flex;gap:8px;margin:16px 0}.source-choice [aria-pressed=true]{border-color:var(--mint);color:var(--mint)}#bundle-text{min-height:170px;font:12px/1.5 ui-monospace,monospace}.preview-item{padding:9px 0}.preview-item p{white-space:pre-wrap;font-size:12px;color:var(--muted);margin-top:5px}.import-note{margin-top:12px}#next-check:focus{outline-offset:6px}#connection-notice .row{margin-top:8px}#import-preview details{margin-top:0}.actions{flex-wrap:wrap}.help-list li{margin:10px 0}.mode-help{font-size:12px;color:var(--muted);margin-top:9px}
 </style>
 </head>
 <body>
 <header><div class="mark" aria-hidden="true">P</div><div><h1>Panther</h1><div class="eyebrow">Companion <span class="version" id="app-version">v—</span></div></div><div class="spacer"></div><div class="status"><span class="dot"></span><span id="status-text">Connecting</span></div><button id="pause" class="small ghost" disabled>Pause</button></header>
 <main>
 <div id="notice" role="status" aria-live="polite"></div>
-<section class="panel goal" aria-labelledby="goal-label"><div class="row between"><div class="section-label" id="goal-label">Your current goal</div><button id="edit-goal" class="small ghost">Edit goal</button></div><p id="goal-text">Loading your workspace…</p><p id="goal-context" class="muted">Your goal guides what deserves attention.</p></section>
-<section aria-label="Companion modes" class="stack"><div class="modes"><button id="explain" class="primary" data-work>Explain this<span>Make sense of evidence</span></button><button id="follow" data-work>Follow this task<span>Quiet, bounded updates</span></button><button id="prepare" data-work>Prepare next decision<span>A brief at your pause</span></button></div><div id="session-bar" class="row between" hidden><span id="session-text"></span><button id="stop" class="small ghost">End follow</button></div></section>
-<section class="panel" aria-labelledby="insight-label"><div class="row between"><h2 id="insight-label">What matters now</h2><span id="topic" class="chip">Ready when you are</span></div><div id="empty" class="empty"><div class="symbol" aria-hidden="true">◌</div><h3 id="empty-title">A little context goes a long way.</h3><p id="empty-copy">Set a goal, then attach selected evidence or import an Intent Capture bundle. Companion will help you find the next useful check.</p><button id="empty-attach" class="ghost">Attach evidence</button></div><article id="card" hidden><div class="explanation" style="margin-top:18px"><div><div class="section-label">What it means</div><p id="means"></p></div><div><div class="section-label">Why it matters here</div><p id="why"></p></div></div><div class="next"><div class="section-label">Your next check</div><p id="next-check"></p></div><p id="card-meta" class="muted"></p><details><summary>Observed, inferred, and still unknown</summary><div class="knowledge"><h3>Observed</h3><ul id="observed"></ul></div><div class="knowledge inferred"><h3>Inferred · check before relying on it</h3><ul id="inferred"></ul></div><div class="knowledge unknown"><h3>Unknown</h3><ul id="unknown"></ul></div></details><details><summary id="refs-label">Evidence sources</summary><ul id="refs"></ul></details><div class="feedback" aria-label="Explanation feedback"><button data-feedback="UsefulMoreLikeThis">Useful</button><button data-feedback="AlreadyKnow">Already know</button><button data-feedback="WrongTask">Wrong task</button><button data-feedback="ExplainMechanism">More detail</button><button data-feedback="UsefulButLater">Later</button><button id="dismiss" class="ghost">Dismiss</button></div></article></section>
-<section class="panel"><div class="row between"><h2>Selected context</h2><span id="context-count" class="muted">No evidence yet</span></div><p class="muted" style="margin:8px 0 14px">Attach what you choose. No screen recording or terminal commands run here.</p><div class="toolbar"><button id="attach">＋ Attach evidence</button><button id="import">Import from Intent Capture</button></div><details id="context-details"><summary>Recent evidence</summary><div id="recent"></div></details><details><summary>Sources &amp; local history</summary><ul id="sources"></ul><p class="muted">Follow reads only configured JSONL sources. Closing Companion ends follow; reopening never resumes it automatically.</p><div class="toolbar" style="margin-top:12px"><button id="export" class="small">Export local history</button><button id="delete" class="small danger ghost">Delete local history</button></div></details></section>
+<div id="connection-notice" class="notice error" role="alert" hidden><strong>Companion is offline.</strong><p>Your saved context stays on this computer. Start Companion again, then retry.</p><div class="row"><button id="retry" class="small">Retry connection</button><span class="muted">This view may show previously loaded context.</span></div></div>
+<section class="panel goal" aria-labelledby="goal-label"><div class="row between"><div class="section-label" id="goal-label">Your current goal</div><button id="edit-goal" class="small ghost" data-connected>Edit goal</button></div><p id="goal-text">Loading your workspace…</p><p id="goal-context" class="muted">Your goal guides what deserves attention.</p></section>
+<section class="panel" aria-label="Your next step">
+<ol class="journey" aria-label="Companion workflow"><li id="step-goal">1 · Set a goal</li><li id="step-evidence">2 · Add evidence</li><li id="step-check">3 · Choose a next check</li></ol>
+<div class="guidance"><h2 id="guide-title">Start with the outcome you want</h2><p id="guide-copy">Then add a note, a terminal result, or an intent bundle.</p></div><button id="guide-action" class="primary" disabled>Set your goal</button>
+</section>
+<section class="panel"><div class="row between"><h2>Evidence for this goal</h2><span id="context-count" class="muted">No evidence yet</span></div><p class="muted" style="margin:8px 0 14px">Choose the context you want explained. Companion uses it to suggest a next check when one is needed.</p><div class="toolbar"><button id="attach" data-work>＋ Attach evidence</button><button id="import" data-connected>Import from Intent Capture</button></div><details id="context-details"><summary>Review selected evidence</summary><div id="recent"></div></details></section>
+<section class="panel" aria-labelledby="insight-label"><div class="row between"><h2 id="insight-label">What matters now</h2><span id="topic" class="chip">Ready when you are</span></div><div id="empty" class="empty"><div class="symbol" aria-hidden="true">▤</div><h3 id="empty-title">A little context goes a long way.</h3><p id="empty-copy">Set a goal, then attach selected evidence or import an Intent Capture bundle. Companion will help you find the next useful check.</p><button id="empty-attach" class="ghost" data-connected>Attach evidence</button></div><article id="card" hidden><div class="explanation" style="margin-top:18px"><div><div class="section-label">What it means</div><p id="means"></p></div><div><div class="section-label">Why it matters here</div><p id="why"></p></div></div><div class="next"><div class="section-label">Your next check</div><p id="next-check" tabindex="-1"></p></div><p id="card-meta" class="muted"></p><details><summary>Observed, inferred, and still unknown</summary><div class="knowledge"><h3>Observed</h3><ul id="observed"></ul></div><div class="knowledge inferred"><h3>Inferred · check before relying on it</h3><ul id="inferred"></ul></div><div class="knowledge unknown"><h3>Unknown</h3><ul id="unknown"></ul></div></details><details><summary id="refs-label">Evidence sources</summary><ul id="refs"></ul></details><div class="feedback" aria-label="Explanation feedback"><button data-feedback="UsefulMoreLikeThis">Useful</button><button data-feedback="AlreadyKnow">Already know</button><button data-feedback="WrongTask">Wrong task</button><button data-feedback="ExplainMechanism">More detail</button><button data-feedback="UsefulButLater">Later</button><button id="dismiss" class="ghost">Dismiss</button></div></article></section>
+<section aria-label="More Companion actions" class="stack"><div class="modes"><button id="explain" data-work>Explain again<span>Use current goal context</span></button><button id="follow" data-work>Follow this task<span>Read configured sources</span></button><button id="prepare" data-work>Prepare a decision<span>Summarize open questions</span></button></div><p id="follow-help" class="mode-help"></p><div id="source-warning" class="notice error" role="alert" hidden></div><div id="session-bar" class="row between" hidden><span id="session-text"></span><button id="stop" class="small ghost" data-connected>End follow</button></div></section>
+<section class="panel"><details id="help-details" style="margin:0;border:0;padding:0"><summary>How Companion works</summary><ol class="help-list muted"><li><strong>Set a goal.</strong> Describe the outcome you want. Changing it starts a fresh context; earlier evidence stays in exported history.</li><li><strong>Add evidence.</strong> Paste a note, a terminal result that already happened, or an intent bundle from Intent Capture. No screen recording starts and no commands run here.</li><li><strong>Choose your next check.</strong> Read the suggestion and inspect its sources. You decide whether to do it; Companion does not execute it or mark it complete.</li></ol><p class="muted"><strong>Explain again</strong> uses the current goal's evidence. <strong>Prepare a decision</strong> summarizes stored questions. <strong>Follow</strong> reads only explicitly configured sources until its deadline. <strong>Pause</strong> stops new reads; resume does not restart Follow.</p></details><details><summary>Sources &amp; local history</summary><ul id="sources"></ul><p class="muted">Use End follow or Pause to stop updates. Closing a browser tab leaves the local service running, so Follow continues until its deadline. Quitting the desktop app stops its process. Restarting a host never resumes Follow automatically. History includes previous goals and may contain sensitive text you selected.</p><div class="toolbar" style="margin-top:12px"><button id="export" class="small" data-connected>Export local history</button><button id="delete" class="small danger ghost" data-connected>Delete local history</button></div></details></section>
 <footer class="footer"><span>Local first · Suggestions stay in your control</span><span id="updated">Not connected</span></footer>
 </main>
-<dialog id="goal-dialog"><form id="goal-form"><h2>What are you working toward?</h2><label>A clear outcome<textarea id="goal-input" maxlength="2000" placeholder="Make the checkout flow reliable and easy to understand"></textarea></label><p class="help">Keep it specific. Changing the goal clears the current explanation and ends any follow session.</p><div class="actions"><button type="button" data-close>Cancel</button><button class="primary" type="submit">Save goal</button></div></form></dialog>
-<dialog id="evidence-dialog"><form id="evidence-form" class="stack"><h2>Attach selected evidence</h2><label>Evidence type<select id="evidence-kind"><option value="note">Note or selected text</option><option value="terminal">Terminal result</option></select></label><div id="terminal-fields" class="stack" hidden><label>Command that already ran<input id="command" maxlength="1000" placeholder="npm test"></label><label>Observed exit code<input id="exit-code" type="number" min="-255" max="255" value="1"></label></div><label id="evidence-text-label">Selected text or output<textarea id="evidence-input" maxlength="12000" required placeholder="Paste only the context you want Companion to use…"></textarea></label><p class="help">This stays in local history. Remove secrets before attaching. Commands are evidence, never executed.</p><div class="actions"><button type="button" data-close>Cancel</button><button class="primary" type="submit">Attach &amp; explain</button></div></form></dialog>
-<dialog id="import-dialog"><h2>Bring a capture into context</h2><p class="muted">Export JSON from Intent Capture's draft review, then choose the bundle here. Only the proposal and its evidence summary are imported.</p><label style="margin:16px 0">Intent bundle JSON<input id="bundle-file" type="file" accept=".json,application/json"></label><div id="import-preview" hidden class="stack"><div class="notice" id="bundle-summary"></div><p id="bundle-goal" class="muted"></p><label class="checkbox"><input id="use-goal" type="checkbox">Use the captured goal as my current goal</label><p class="help">Proposals remain unverified. Import does not create tickets or authorize work.</p></div><div class="actions"><button data-close>Cancel</button><button id="confirm-import" class="primary" disabled>Import &amp; explain</button></div></dialog>
+<dialog id="goal-dialog"><form id="goal-form"><h2>What are you working toward?</h2><label>A clear outcome<textarea id="goal-input" maxlength="2000" required placeholder="Make the checkout flow reliable and easy to understand"></textarea></label><p class="help">Keep it specific. Changing the goal clears the current explanation and ends any follow session.</p><div class="actions"><button type="button" data-close>Cancel</button><button class="primary" type="submit" data-connected>Save goal</button></div></form></dialog>
+<dialog id="evidence-dialog"><form id="evidence-form" class="stack"><h2>Attach selected evidence</h2><label>Evidence type<select id="evidence-kind"><option value="note">Note or selected text</option><option value="terminal">Terminal result</option></select></label><div id="terminal-fields" class="stack" hidden><label>Command that already ran<input id="command" maxlength="1000" placeholder="npm test"></label><label>Observed exit code<input id="exit-code" type="number" min="-255" max="255" step="1" placeholder="0 means success; a nonzero code means failure"></label></div><label id="evidence-text-label">Selected text or output<textarea id="evidence-input" maxlength="12000" required placeholder="Paste only the context you want Companion to use…"></textarea></label><p class="help">This stays in local history. Remove secrets before attaching. Commands are evidence, never executed.</p><div class="actions"><button type="button" data-close>Cancel</button><button class="primary" type="submit" data-work>Attach &amp; explain</button></div></form></dialog>
+<dialog id="import-dialog" aria-labelledby="import-title"><h2 id="import-title">Import an intent bundle</h2><p id="import-state" class="notice" role="status" aria-live="polite" hidden></p><p class="muted">In Intent Capture, review the draft proposals and export the intent bundle JSON. Choose its file or paste the full JSON below.</p>
+<div class="source-choice" role="group" aria-label="Bundle input method"><button id="bundle-source-file" aria-pressed="true">Choose JSON file</button><button id="bundle-source-paste" aria-pressed="false">Paste bundle JSON</button></div>
+<div id="bundle-file-panel"><label>Intent bundle file<input id="bundle-file" type="file" accept=".json,application/json"></label><p class="help">If the file chooser is unavailable, use Paste bundle JSON.</p></div>
+<div id="bundle-paste-panel" hidden><label>Full intent bundle JSON<textarea id="bundle-text" maxlength="1048576" spellcheck="false" placeholder='{"schema": "…", "schema_version": "1.2", …}'></textarea></label><p class="help">Open the exported .json file as text, copy all of it, then paste here. Your clipboard is read only when you paste.</p></div>
+<p class="help import-note">Up to 25 proposals · 1 MiB maximum · Preview adds nothing to your history.</p><div class="row" style="margin:14px 0"><button id="preview-bundle">Preview bundle</button><span id="preview-status" class="muted" role="status" aria-live="polite"></span></div>
+<div id="import-preview" hidden class="stack"><div class="notice" id="bundle-summary"></div><p id="bundle-goal" class="muted"></p><p id="bundle-current-goal" class="muted"></p><label class="checkbox"><input id="use-goal" type="checkbox">Use the captured goal as my current goal</label><p class="help">Changing the goal clears the current explanation and ends Follow. Leave this unchecked to keep your current goal.</p><details open><summary>Review what will be added</summary><ul id="bundle-proposals"></ul></details><p class="help">Evidence summaries are producer-reported, not independently verified. Import does not create tickets, run checks, or authorize work.</p></div><div class="actions"><button data-close>Cancel</button><button id="confirm-import" class="primary" disabled>Import proposals</button></div></dialog>
 <dialog id="delete-dialog"><form id="delete-form"><h2>Delete local Companion history?</h2><p class="muted">This removes goals, selected evidence, explanations, and feedback from this Companion store. Export anything you want to keep first.</p><label style="margin-top:16px">Type DELETE to confirm<input id="delete-confirm" autocomplete="off" required pattern="DELETE"></label><div class="actions"><button type="button" data-close>Cancel</button><button class="danger" type="submit">Delete local history</button></div></form></dialog>
 <script>
 const $ = id => document.getElementById(id);
-let current = null, busy = false, connected = false, bundle = null, bundleGeneration = 0, noticeTimer;
+let current = null, busy = false, connected = false, bundle = null, bundleGeneration = 0, bundleMode = 'file', previewBusy = false, noticeTimer;
 async function api(action, data = {}) {
   if (window.pantherAPI) return window.pantherAPI.action(action, data);
   const read = action === 'status' || action === 'export';
@@ -33,51 +46,178 @@ async function api(action, data = {}) {
   if (!response.ok) throw new Error(result.error || 'This action could not finish.');
   return result;
 }
-function notice(message, error = false) { const dialog=document.querySelector('dialog[open]'); if(dialog && error){let local=dialog.querySelector('[data-error]');if(!local){local=document.createElement('p');local.dataset.error='true';local.className='notice error';local.setAttribute('role','alert');dialog.prepend(local);}local.textContent=message;} clearTimeout(noticeTimer); $('notice').textContent = message; $('notice').className = 'notice' + (error ? ' error' : ''); if (!error) noticeTimer = setTimeout(() => $('notice').textContent = '', 7000); }
-function list(id, items, fallback = 'None in the selected evidence.') { const target = $(id); target.replaceChildren(); for (const item of items?.length ? items : [fallback]) { const li = document.createElement('li'); li.textContent = item; target.append(li); } }
+function clearDialogError(dialog) { dialog.querySelectorAll('[data-error]').forEach(el => el.remove()); }
+function notice(message, error = false) {
+  const dialog = document.querySelector('dialog[open]');
+  if (dialog && error) {
+    clearDialogError(dialog);
+    const local = document.createElement('p'); local.dataset.error = 'true'; local.className = 'notice error'; local.setAttribute('role', 'alert'); local.textContent = message; dialog.prepend(local);
+  }
+  clearTimeout(noticeTimer); $('notice').textContent = message; $('notice').className = 'notice' + (error ? ' error' : '');
+  if (!error) noticeTimer = setTimeout(() => $('notice').textContent = '', 7000);
+}
+function list(id, items, fallback = 'None in the selected evidence.') {
+  const target = $(id); target.replaceChildren();
+  for (const item of items?.length ? items : [fallback]) { const li = document.createElement('li'); li.textContent = item; target.append(li); }
+}
 function formatTime(time) { const date = new Date(time); return Number.isFinite(date.getTime()) ? date.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : 'Unknown time'; }
-function setWorking(value) { busy = value; document.querySelectorAll('[data-work],#confirm-import').forEach(el => el.disabled = value || !connected || !!current?.paused || (el.id === 'confirm-import' && !bundle)); }
+function hasSources() { return current?.sources.some(source => source.endsWith(': configured')); }
+function setWorking(value) {
+  busy = value;
+  const waiting = busy || !!current?.busy;
+  document.querySelectorAll('[data-work]').forEach(el => el.disabled = waiting || !connected || !!current?.paused);
+  document.querySelectorAll('[data-connected]').forEach(el => el.disabled = waiting || !connected);
+  $('follow').disabled ||= !current?.goal.correctedByUser || !hasSources();
+  $('confirm-import').disabled = waiting || !connected || !!current?.paused || !bundle;
+  $('confirm-import').textContent = current?.paused ? 'Resume Companion to import' : bundle ? `Import ${bundle.tickets.length} proposal${bundle.tickets.length === 1 ? '' : 's'}` : 'Import proposals';
+  $('use-goal').disabled = waiting || !bundle?.recording?.stated_goal?.trim();
+  $('import-state').textContent = !connected ? 'Connection unavailable. Close this dialog and retry the connection.' : current?.paused ? 'Companion is paused. Close this dialog and choose Resume before importing.' : waiting ? 'Working on your request. A local model can take up to a minute.' : '';
+  $('import-state').hidden = !$('import-state').textContent;
+  $('status-text').textContent = !connected ? 'Offline' : current?.paused ? 'Paused' : waiting ? 'Working…' : current?.session?.status === 'active' ? 'Following' : 'Ready';
+  $('preview-bundle').disabled = waiting || !connected || previewBusy;
+  for (const id of ['bundle-file', 'bundle-text', 'bundle-source-file', 'bundle-source-paste']) $(id).disabled = waiting;
+  $('guide-action').disabled = waiting || !connected;
+}
+function renderGuidance(data) {
+  const hasGoal = data.goal.correctedByUser && !data.goal.needsCorrection, hasEvidence = data.observations.length > 0;
+  const step = !hasGoal ? 'goal' : !hasEvidence ? 'evidence' : 'check';
+  for (const name of ['goal','evidence','check']) { const el = $('step-' + name); if (name === step) el.setAttribute('aria-current','step'); else el.removeAttribute('aria-current'); }
+  let title, copy, label, action;
+  if (data.paused) { title='Companion is paused'; copy='Your context stays here. Resume when you want to add evidence or ask for an explanation.'; label='Resume Companion'; action='resume'; }
+  else if (!hasGoal) { title=data.goal.needsCorrection?'Update the goal for this task':'Start with the outcome you want'; copy='One sentence is enough. For example: “Make checkout save the selected shipping option.”'; label='Set your goal'; action='goal'; }
+  else if (!hasEvidence) { title='Your goal is set. Add some evidence'; copy='Paste a note or a terminal result, or import an intent bundle below. Companion checks it against your goal.'; label='Attach evidence'; action='attach'; }
+  else if (data.live) { title='Your next check is ready to review'; copy='Read the suggestion below and inspect its evidence. You choose whether to do it.'; label='Read the next check'; action='read'; }
+  else if (data.lastDecision?.reason === 'routine success') { title='The latest result needs no interruption'; copy='The command succeeded. Keep working, and attach a new result when you need help.'; label='Attach a new result'; action='attach'; }
+  else { title='Your selected evidence is ready'; copy='Ask Companion to explain the evidence already attached to this goal, or add a newer result below.'; label='Explain selected evidence'; action='explain'; }
+  $('guide-title').textContent=title; $('guide-copy').textContent=copy; $('guide-action').textContent=label; $('guide-action').dataset.action=action;
+}
 function render(data) {
-  current = data; connected = true;
+  const changedGoal = current && data.goal.id !== current.goal.id;
+  current = data; connected = true; $('connection-notice').hidden = true;
+  if (changedGoal && !busy && $('import-dialog').open) { invalidateBundle(); $('preview-status').textContent='Your current goal changed. Preview this bundle again before importing.'; }
   $('app-version').textContent = 'v' + (data.version || '?');
   $('status-text').textContent = data.paused ? 'Paused' : data.busy ? 'Thinking' : data.session?.status === 'active' ? 'Following' : 'Ready';
   $('pause').textContent = data.paused ? 'Resume' : 'Pause'; $('pause').disabled = false;
   $('goal-text').textContent = data.goal.correctedByUser ? data.goal.hypothesis : 'Give your work a direction.';
   $('goal-context').textContent = data.goal.needsCorrection ? 'Marked as the wrong task. Edit the goal to continue.' : data.goal.correctedByUser ? 'Your stated goal · Edit it whenever the task changes.' : 'Set the outcome you want. Companion will keep it in view.';
   const active = data.session?.status === 'active'; $('session-bar').hidden = !active; $('session-text').textContent = active ? `Following until ${formatTime(data.session.endsAt)} · Only configured sources` : '';
+  $('follow-help').textContent = hasSources() ? 'Follow reads configured sources for a limited session. It does not record your screen.' : 'Follow is unavailable until a source is configured. Attaching evidence and importing bundles work now.';
+  $('source-warning').hidden = !data.error; $('source-warning').textContent = data.error || '';
+  renderGuidance(data);
   const live = data.live;
   $('card').hidden = !live; $('empty').hidden = !!live;
-  if (live) { const e = live.explanation; $('topic').textContent = live.producedBy === 'prepare' ? 'Decision brief' : 'Evidence explained'; $('means').textContent = e.whatItMeans; $('why').textContent = e.whyItMattersHere; $('next-check').textContent = e.nextCheck; $('card-meta').textContent = `Based on selected evidence · ${formatTime(e.createdAt)} · ${e.evidence.length} source${e.evidence.length === 1 ? '' : 's'}`; list('observed', e.observed); list('inferred', e.inferred, 'No inference added.'); list('unknown', e.unknown); list('refs', e.evidence.map(ref => `${ref.label} — ${ref.providerId} · ${ref.locator}`)); $('refs-label').textContent = `Evidence sources (${e.evidence.length})`; }
-  else { $('topic').textContent = data.paused ? 'Paused' : 'Ready when you are'; $('empty-title').textContent = data.paused ? 'Your attention comes first.' : data.lastDecision?.reason === 'routine success' ? 'Nothing here needs an interruption.' : data.goal.correctedByUser ? 'Your goal is set. Bring in the context.' : 'A little context goes a long way.'; $('empty-copy').textContent = data.paused ? 'No sources are being read. Resume when you want a fresh explanation.' : data.lastDecision?.reason === 'routine success' ? 'The captured command succeeded. Keep going, or attach another result when you need help.' : 'Attach selected evidence or import an Intent Capture bundle. Companion will help you find the next useful check.'; }
+  if (live) {
+    const e = live.explanation; $('topic').textContent = live.producedBy === 'prepare' ? 'Decision brief' : 'Evidence explained'; $('means').textContent = e.whatItMeans; $('why').textContent = e.whyItMattersHere; $('next-check').textContent = e.nextCheck;
+    $('card-meta').textContent = `Based on selected evidence · ${formatTime(e.createdAt)} · ${e.evidence.length} source${e.evidence.length === 1 ? '' : 's'}`;
+    list('observed', e.observed); list('inferred', e.inferred, 'No inference added.'); list('unknown', e.unknown); list('refs', e.evidence.map(ref => `${ref.label} — ${ref.providerId} · ${ref.locator}`)); $('refs-label').textContent = `Evidence sources (${e.evidence.length})`;
+  } else {
+    const hasEvidence = data.observations.length > 0, quiet = hasEvidence && data.lastDecision?.reason === 'routine success';
+    $('topic').textContent = data.paused ? 'Paused' : 'Ready when you are';
+    $('empty-title').textContent = data.paused ? 'Your context is saved.' : quiet ? 'Nothing here needs an interruption.' : hasEvidence ? 'Context is ready to explain.' : 'Your next check will appear here.';
+    $('empty-copy').textContent = data.paused ? 'Resume to request a fresh explanation.' : quiet ? 'The captured command succeeded. Keep going, or attach a new result.' : hasEvidence ? 'Your selected evidence is still attached to this goal. Explain it again whenever you need a fresh view.' : 'Set a goal and add evidence above. Companion will connect what happened to a useful next check.';
+    $('empty-attach').textContent = data.paused ? 'Resume Companion' : hasEvidence && !quiet ? 'Explain selected evidence' : 'Attach evidence';
+    $('empty-attach').dataset.action = data.paused ? 'resume' : hasEvidence && !quiet ? 'explain' : 'attach';
+  }
   list('sources', data.sources, 'No external sources configured. Manual evidence and Intent Capture imports work independently.');
   $('context-count').textContent = data.observations.length ? `${data.observations.length} recent item${data.observations.length === 1 ? '' : 's'}` : 'No evidence yet'; $('recent').replaceChildren();
-  if (!data.observations.length) { const p = document.createElement('p'); p.className='muted';p.textContent='Your selected evidence will appear here.'; $('recent').append(p); }
-  for (const observation of [...data.observations].reverse()) { const item = document.createElement('div');item.className='evidence-item'; const meta=document.createElement('div');meta.className='meta';meta.textContent=`${observation.providerId} · ${formatTime(observation.capturedAt)}`;const p=document.createElement('p');p.textContent=observation.summary.slice(0,600);item.append(meta,p);$('recent').append(item); }
+  if (!data.observations.length) { const p = document.createElement('p'); p.className='muted'; p.textContent='Evidence attached to this goal will appear here. Earlier goals remain in exported history.'; $('recent').append(p); }
+  for (const observation of [...data.observations].reverse()) { const item=document.createElement('div'); item.className='evidence-item'; const meta=document.createElement('div'); meta.className='meta'; meta.textContent=`${observation.providerId} · ${formatTime(observation.capturedAt)}`; const p=document.createElement('p'); p.textContent=observation.summary.slice(0,600); item.append(meta,p); $('recent').append(item); }
   $('updated').textContent = 'Updated ' + formatTime(new Date()); setWorking(busy);
 }
-async function refresh() { if (busy) return; try { render(await api('status')); } catch { connected=false; $('status-text').textContent='Offline';$('updated').textContent='Connection unavailable';$('pause').disabled=true;setWorking(false);notice('Companion is not reachable. Start it again; your saved context stays on this computer.',true); } }
-async function perform(action,data={},message='') { setWorking(true);try { const result=await api(action,data);if(result?.goal) render(result);if(message) notice(message);return result; } catch(error){ notice(error.message || 'The action did not finish.',true);throw error; } finally { setWorking(false); } }
-function openDialog(id){ $(id).querySelectorAll('[data-error]').forEach(el=>el.remove()); $(id).showModal(); }
+async function refresh() {
+  if (busy) return;
+  try { render(await api('status')); }
+  catch { connected=false; $('status-text').textContent='Offline'; $('updated').textContent='Connection unavailable'; $('pause').disabled=true; $('connection-notice').hidden=false; setWorking(false); }
+}
+async function perform(action, data={}, message='') {
+  setWorking(true);
+  try { const result=await api(action,data); if(result?.goal) render(result); if(message) notice(message); return result; }
+  catch(error) { notice(error.message || 'The action did not finish. Your saved evidence remains available. Try again.',true); throw error; }
+  finally { setWorking(false); }
+}
+function openDialog(id) { clearDialogError($(id)); $(id).showModal(); }
+function invalidateBundle() {
+  bundleGeneration++; bundle=null; previewBusy=false; $('import-preview').hidden=true; $('use-goal').checked=false; $('confirm-import').textContent='Import proposals'; $('preview-status').textContent=''; clearDialogError($('import-dialog')); setWorking(busy);
+  return bundleGeneration;
+}
+function chooseBundleMode(mode) {
+  bundleMode=mode; invalidateBundle();
+  $('bundle-file-panel').hidden=mode!=='file'; $('bundle-paste-panel').hidden=mode!=='paste';
+  $('bundle-source-file').setAttribute('aria-pressed',String(mode==='file')); $('bundle-source-paste').setAttribute('aria-pressed',String(mode==='paste'));
+  $(mode==='paste'?'bundle-text':'bundle-file').focus();
+}
+async function previewBundle() {
+  if (busy || previewBusy || !connected) return;
+  const generation=invalidateBundle(); previewBusy=true; $('preview-status').textContent='Checking the bundle…'; setWorking(busy);
+  try {
+    let raw;
+    if (bundleMode==='file') {
+      const file=$('bundle-file').files[0]; if(!file) throw new Error('Choose an intent bundle JSON file, or select Paste bundle JSON.');
+      if(file.size>1024*1024) throw new Error('This bundle is too large. Export fewer proposals in Intent Capture (limit: 1 MiB).');
+      raw=await file.text();
+    } else raw=$('bundle-text').value;
+    if (generation!==bundleGeneration || !$('import-dialog').open) return;
+    if(!raw.trim()) throw new Error('Paste the full intent bundle JSON, then choose Preview bundle.');
+    if(new TextEncoder().encode(raw).length>1024*1024) throw new Error('This bundle is too large. Export fewer proposals in Intent Capture (limit: 1 MiB).');
+    let candidate;
+    try { candidate=JSON.parse(raw); } catch { throw new Error('This is not valid JSON. Copy the full exported intent bundle, including its opening and closing braces, then preview again.'); }
+    if(new TextEncoder().encode(JSON.stringify({bundle:candidate,useGoal:false})).length>1024*1024) throw new Error('This bundle is too large to import. Export fewer proposals in Intent Capture (limit: 1 MiB).');
+    let preview;
+    try { preview=await api('import-preview',{bundle:candidate}); }
+    catch(error) { throw new Error(`${error.message || 'The bundle could not be checked.'} Export a new intent bundle from Intent Capture after reviewing its drafts, then preview again.`); }
+    if(generation!==bundleGeneration || !$('import-dialog').open) return;
+    $('bundle-summary').textContent=`${preview.title||'Untitled capture'} · ${preview.count} proposal${preview.count===1?'':'s'}\nSource: ${preview.sourceUrl||'Not supplied'}`;
+    $('bundle-goal').textContent=preview.goal?`Captured goal: ${preview.goal}`:'No captured goal was supplied.';
+    $('bundle-current-goal').textContent=current?.goal.correctedByUser?`Your current goal will stay: ${current.goal.hypothesis}`:'No current goal is set. You can choose to use the captured goal below.';
+    $('use-goal').disabled=!preview.goal;
+    $('bundle-proposals').replaceChildren();
+    for(const observation of preview.observations) {
+      const li=document.createElement('li'); li.className='preview-item'; const title=document.createElement('strong'); title.textContent=observation.label;
+      const summary=document.createElement('p'); summary.textContent='Producer-reported evidence: '+observation.summary.slice(0,600)+(observation.summary.length>600?'…':'');
+      li.append(title,summary); $('bundle-proposals').append(li);
+    }
+    $('import-preview').hidden=false;
+    if(!preview.count) { $('preview-status').textContent='This bundle has no proposals. Review drafts in Intent Capture and export a new bundle.'; }
+    else { bundle=candidate; $('preview-status').textContent='Preview ready. Nothing has been imported yet.'; $('confirm-import').textContent=`Import ${preview.count} proposal${preview.count===1?'':'s'}`; }
+  } catch(error) { if(generation===bundleGeneration && $('import-dialog').open) { $('preview-status').textContent='Preview could not finish. Nothing was imported.'; notice(error.message,true); } }
+  finally { if(generation===bundleGeneration) { previewBusy=false; setWorking(busy); } }
+}
 document.querySelectorAll('[data-close]').forEach(button=>button.onclick=()=>button.closest('dialog').close());
-$('edit-goal').onclick=()=>{ $('goal-input').value=current?.goal.correctedByUser?current.goal.hypothesis:'';openDialog('goal-dialog');$('goal-input').focus(); };
-$('goal-form').onsubmit=async event=>{event.preventDefault();try{await perform('goal',{hypothesis:$('goal-input').value.trim()||null},'Goal saved.');$('goal-dialog').close();}catch{}};
-$('pause').onclick=()=>perform('pause',{paused:!current.paused},current.paused?'Resumed. Start Follow again when you want updates.':'Paused. No new sources will be read.').catch(()=>{});
-for(const mode of ['explain','follow','prepare'])$(mode).onclick=()=>perform(mode).catch(()=>{});
+$('retry').onclick=()=>refresh();
+$('edit-goal').onclick=()=>{ $('goal-input').value=current?.goal.correctedByUser?current.goal.hypothesis:''; openDialog('goal-dialog'); $('goal-input').focus(); };
+$('goal-form').onsubmit=async event=>{ event.preventDefault(); const hypothesis=$('goal-input').value.trim(); if(!hypothesis) { notice('Describe the outcome you want, then save your goal.',true); return; } try { await perform('goal',{hypothesis},'Goal saved. Add evidence for this goal below.'); $('goal-dialog').close(); } catch {} };
+$('pause').onclick=()=>perform('pause',{paused:!current.paused},current.paused?'Resumed. Start Follow again if you want updates.':'Paused. No new sources will be read.').catch(()=>{});
+for(const mode of ['explain','follow','prepare']) $(mode).onclick=()=>perform(mode).catch(()=>{});
 $('stop').onclick=()=>perform('stop',{},'Follow ended.').catch(()=>{});
-$('attach').onclick=$('empty-attach').onclick=()=>openDialog('evidence-dialog');
-$('evidence-kind').onchange=()=>{$('terminal-fields').hidden=$('evidence-kind').value!=='terminal';$('command').required=$('evidence-kind').value==='terminal';};
-$('evidence-form').onsubmit=async event=>{event.preventDefault();try{await perform('observation',{kind:$('evidence-kind').value,text:$('evidence-input').value,command:$('command').value,exitCode:Number($('exit-code').value)},'Selected evidence attached.');$('evidence-dialog').close();$('evidence-input').value='';}catch{}};
-$('import').onclick=()=>{bundleGeneration++;bundle=null;$('bundle-file').value='';$('import-preview').hidden=true;$('confirm-import').disabled=true;$('use-goal').checked=false;openDialog('import-dialog');};
-$('import-dialog').addEventListener('close',()=>{bundleGeneration++;bundle=null;});
-$('bundle-file').onchange=async()=>{const generation=++bundleGeneration;bundle=null;$('confirm-import').disabled=true;$('import-preview').hidden=true;try{const file=$('bundle-file').files[0];if(!file)return;if(file.size>1024*1024)throw new Error('Choose a JSON bundle smaller than 1 MiB.');const candidate=JSON.parse(await file.text());const preview=await api('import-preview',{bundle:candidate});if(generation!==bundleGeneration||!$('import-dialog').open)return;bundle=candidate;$('bundle-summary').textContent=`${preview.title||'Untitled capture'} · ${preview.count} review proposal${preview.count===1?'':'s'}\n${preview.sourceUrl||'Source URL not supplied'}`;$('bundle-goal').textContent=preview.goal?`Captured goal: ${preview.goal}`:'No goal was supplied in this capture.';$('use-goal').disabled=!preview.goal;$('import-preview').hidden=false;$('confirm-import').disabled=false;}catch(error){if(generation===bundleGeneration&&$('import-dialog').open)notice(error.message||'Choose a valid Intent Capture bundle.',true);}};
-$('confirm-import').onclick=async()=>{try{const result=await perform('import',{bundle,useGoal:$('use-goal').checked});$('import-dialog').close();notice(`${result.imported} review proposal${result.imported===1?'':'s'} imported. No work was authorized.`);bundle=null;}catch{}};
-document.querySelectorAll('[data-feedback]').forEach(button=>button.onclick=async()=>{try{await perform('feedback',{kind:button.dataset.feedback},'Feedback saved locally.');if(button.dataset.feedback==='WrongTask')$('edit-goal').click();if(button.dataset.feedback==='ExplainMechanism')await perform('explain');}catch{}});
+$('attach').onclick=()=>{ openDialog('evidence-dialog'); $('evidence-input').focus(); };
+function guidedAction(action) {
+  if(action==='goal') $('edit-goal').click();
+  else if(action==='attach') $('attach').click();
+  else if(action==='resume') $('pause').click();
+  else if(action==='explain') $('explain').click();
+  else if(action==='read') { $('next-check').scrollIntoView({block:'center'}); $('next-check').focus({preventScroll:true}); }
+}
+$('guide-action').onclick=()=>guidedAction($('guide-action').dataset.action);
+$('empty-attach').onclick=()=>guidedAction($('empty-attach').dataset.action);
+$('evidence-kind').onchange=()=>{ const terminal=$('evidence-kind').value==='terminal'; $('terminal-fields').hidden=!terminal; $('command').required=terminal; $('exit-code').required=terminal; };
+$('evidence-form').onsubmit=async event=>{ event.preventDefault(); try { await perform('observation',{kind:$('evidence-kind').value,text:$('evidence-input').value,command:$('command').value,exitCode:Number($('exit-code').value)},'Evidence saved. Review the result below; routine success stays quiet.'); $('evidence-dialog').close(); $('evidence-input').value=''; } catch {} };
+$('import').onclick=()=>{ $('bundle-file').value=''; $('bundle-text').value=''; chooseBundleMode('file'); openDialog('import-dialog'); };
+$('import-dialog').addEventListener('close',()=>invalidateBundle());
+$('bundle-source-file').onclick=()=>chooseBundleMode('file'); $('bundle-source-paste').onclick=()=>chooseBundleMode('paste');
+$('bundle-file').onchange=()=>invalidateBundle(); $('bundle-text').oninput=()=>invalidateBundle();
+$('preview-bundle').onclick=previewBundle;
+$('confirm-import').onclick=async()=>{
+  if(!bundle || busy || current?.paused || !connected) return;
+  const generation=bundleGeneration, candidate=bundle, useGoal=$('use-goal').checked;
+  try { const result=await perform('import',{bundle:candidate,useGoal}); if(generation===bundleGeneration) $('import-dialog').close(); notice(`${result.imported} proposal${result.imported===1?'':'s'} imported. ${useGoal?'Captured goal adopted.':'Your goal is unchanged.'} Review the next check; no work has been run.`); } catch {}
+};
+document.querySelectorAll('[data-feedback]').forEach(button=>button.onclick=async()=>{ try { await perform('feedback',{kind:button.dataset.feedback},'Feedback saved locally.'); if(button.dataset.feedback==='WrongTask') $('edit-goal').click(); if(button.dataset.feedback==='ExplainMechanism') await perform('explain'); } catch {} });
 $('dismiss').onclick=()=>perform('dismiss',{},'Explanation dismissed. Selected evidence remains available.').catch(()=>{});
-$('export').onclick=async()=>{try{const data=await api('export');const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='panther-companion.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);notice('Local history exported.');}catch(error){notice(error.message,true);}};
-$('delete').onclick=()=>{$('delete-confirm').value='';openDialog('delete-dialog');};
-$('delete-form').onsubmit=async event=>{event.preventDefault();try{await perform('delete',{confirm:$('delete-confirm').value},'Local Companion history deleted.');$('delete-dialog').close();}catch{}};
-document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();$('edit-goal').click();}});
-void refresh();setInterval(refresh,4000);
+$('export').onclick=async()=>{ try { const data=await api('export'); const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})); const a=document.createElement('a'); a.href=url; a.download='panther-companion.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); notice('Local history exported.'); } catch(error) { notice(error.message,true); } };
+$('delete').onclick=()=>{ $('delete-confirm').value=''; openDialog('delete-dialog'); };
+$('delete-form').onsubmit=async event=>{ event.preventDefault(); try { await perform('delete',{confirm:$('delete-confirm').value},'Local Companion history deleted.'); $('delete-dialog').close(); } catch {} };
+document.addEventListener('keydown',event=>{ if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k') { event.preventDefault(); if(connected && !document.querySelector('dialog[open]')) $('edit-goal').click(); } });
+void refresh(); setInterval(refresh,4000);
 </script>
 </body>
 </html>
