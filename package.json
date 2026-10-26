@@ -1,6 +1,6 @@
 {
   "name": "panther-companion",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "description": "Local-first companion that explains current evidence for the current goal, and stays quiet otherwise.",
@@ -16,7 +16,10 @@
     "electron": "electron .",
     "start": "npm run build && electron .",
     "explain": "npm run build && node dist/src/cli.js explain",
-    "panther": "node dist/src/cli.js"
+    "panther": "node dist/src/cli.js",
+    "icon": "python3 scripts/make-icon.py",
+    "package": "npm run build && electron-builder --mac dir",
+    "package:dmg": "npm run build && electron-builder --mac dmg"
   },
   "engines": {
     "node": ">=22.13"
@@ -24,9 +27,14 @@
   "devDependencies": {
     "@types/node": "^24.10.1",
     "electron": "^35.7.5",
+    "electron-builder": "^26.18.0",
     "typescript": "^5.9.3"
   },
   "allowScripts": {
     "electron@35.7.5": true
+  },
+  "author": {
+    "name": "Mike Hamanaka",
+    "email": "mike@sjultra.com"
   }
 }

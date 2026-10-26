@@ -101,7 +101,7 @@ function render(data) {
   $('goal-text').textContent = data.goal.correctedByUser ? data.goal.hypothesis : 'Give your work a direction.';
   $('goal-context').textContent = data.goal.needsCorrection ? 'Marked as the wrong task. Edit the goal to continue.' : data.goal.correctedByUser ? 'Your stated goal · Edit it whenever the task changes.' : 'Set the outcome you want. Companion will keep it in view.';
   const active = data.session?.status === 'active'; $('session-bar').hidden = !active; $('session-text').textContent = active ? `Following until ${formatTime(data.session.endsAt)} · Only configured sources` : '';
-  $('follow-help').textContent = hasSources() ? 'Follow reads configured sources for a limited session. It does not record your screen.' : 'Follow needs a capture source. Run a command through scripts/capture-command.sh in your terminal and Companion will read its outcome. Attaching evidence and importing bundles work right now.';
+  $('follow-help').textContent = hasSources() ? 'Follow reads configured sources for a limited session. It does not record your screen.' : `Follow needs a capture source. Run a command through ${data.captureScript || 'scripts/capture-command.sh'} and Companion will read its outcome. Attaching evidence and importing bundles work right now.`;
   $('source-warning').hidden = !data.error; $('source-warning').textContent = data.error || '';
   renderGuidance(data);
   const live = data.live;

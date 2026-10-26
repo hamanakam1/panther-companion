@@ -1,0 +1,41 @@
+# electron-builder — the double-clickable macOS app.
+#
+# The packaged app is unsigned: it is built for this machine, not distributed,
+# so Gatekeeper has nothing to verify and no notarisation is attempted. If this
+# is ever handed to someone else, add a Developer ID identity and notarise
+# before calling it installable.
+appId: com.hamanakam1.panther-companion
+productName: Panther Companion
+directories:
+  output: release
+  buildResources: build
+
+# src/paths.ts resolves bundled assets from the app root, so every asset the
+# running app reads must sit at the top level inside the asar. test/packaging.test.ts
+# fails if a new path is added here without being packaged.
+files:
+  - dist/**/*
+  - surface/card.html
+  - prompts/**/*
+  - config/**/*
+  - package.json
+  - "!**/*.map"
+
+asar: true
+npmRebuild: false
+
+# The surface names the producer by absolute path, so the packaged app carries
+# its own copy instead of pointing at a checkout that may not be on this machine.
+extraResources:
+  - from: scripts/capture-command.sh
+    to: capture-command.sh
+
+mac:
+  category: public.app-category.productivity
+  icon: build/icon.png
+  # Unsigned local build: never try to discover a signing identity.
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  target:
+    - target: dir

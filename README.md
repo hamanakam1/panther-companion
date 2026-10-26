@@ -15,13 +15,26 @@ npm run serve
 # Open http://127.0.0.1:8765
 ```
 
-For the native desktop panel:
+For the native desktop panel without packaging:
 
 ```sh
 npm start
 ```
 
 The desktop window respects the chosen display's work area, including negative coordinates and the menu bar. It is resizable and does not stay above other apps. `Cmd/Ctrl+Shift+E` brings it forward. `Cmd/Ctrl+K` edits the goal while the panel has focus. `node scripts/launch-panther.js` launches the same maintained entry point after a build.
+
+### Install as an app
+
+```sh
+npm run package
+cp -R "release/mac-arm64/Panther Companion.app" /Applications/
+```
+
+The result is a single double-clickable `Panther Companion.app` that bundles its own Electron runtime, so the machine that runs it needs no Node install and no checkout. It places itself on the right edge of the largest secondary display and reads the same `~/.panther-companion` state as the browser surface.
+
+The local build is unsigned and un-notarised: it is made for this machine, and `mac.identity` is pinned to `null` so no certificate is ever picked up by accident. Hand it to someone else only after adding a Developer ID identity and notarising it.
+
+`npm run package:dmg` builds a disk image instead of a bare app. `npm run icon` regenerates `build/icon.png` from `scripts/make-icon.py`.
 
 ## A useful first session
 
@@ -31,7 +44,13 @@ The desktop window respects the chosen display's work area, including negative c
 4. **Give feedback** — Useful, Already know, Wrong task, More detail, and Later adjust local preferences. Wrong task clears the card and asks you to edit the goal.
 5. **Pause** when you want quiet. No source is read and no new evidence is accepted while paused. Resume enables explicit actions; start Follow again if you want continuous updates.
 
-The interface distinguishes a missing goal, missing evidence, selected evidence ready to explain, a next check ready to read, paused work, and a lost connection with a Retry action. Follow is unavailable in the interface until a source is configured; manual evidence and imports still work independently. Terminal results require an explicit observed exit code, with no assumed failure.
+The interface distinguishes a missing goal, missing evidence, selected evidence ready to explain, a next check ready to read, paused work, and a lost connection with a Retry action. Follow stays unavailable until a source is configured; manual evidence and imports still work independently. To give Follow something to read, wrap the command you already run:
+
+```sh
+scripts/capture-command.sh npm test
+```
+
+It appends the command, exit code, directory, branch and captured output to `~/.panther-companion/terminal.jsonl` and passes the command's own output and exit code straight through. The environment is never recorded; remove secrets from arguments before wrapping them. A packaged app carries its own copy at `Panther Companion.app/Contents/Resources/capture-command.sh` and names that path in the interface. Terminal results require an explicit observed exit code, with no assumed failure.
 
 Routine successful commands remain quiet. Empty captures state that evidence is missing. The default reasoner uses deterministic local rules, so the basic workflow responds immediately without waiting for a model.
 

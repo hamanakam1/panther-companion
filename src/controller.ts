@@ -3,6 +3,7 @@ import { Panther } from "./ingest.js";
 import { FEEDBACK_KINDS, type FeedbackKind, type Observation } from "./domain.js";
 import { InputError, parseIntentBundle, record, text } from "./bundle.js";
 import { VERSION } from "./version.js";
+import { captureScriptPath } from "./paths.js";
 
 const now = () => new Date().toISOString();
 export class CompanionController {
@@ -23,7 +24,7 @@ export class CompanionController {
     p.store.expireDue(this.clock());
     const session = p.store.getSession();
     if (session?.status === "active" && session.endsAt <= this.clock()) { p.invalidate(); p.store.saveSession({ ...session, status: "ended" }); }
-    return { goal: p.store.getGoal(this.clock()), live: p.store.getLive(), session: p.store.getSession(), paused: p.store.getPreferences().paused, sources: p.sources(), observable: p.observableSources(), counts: p.store.countInsights(), observations: p.store.latestObservations(8).map(({ payload: _payload, signature: _signature, ...rest }) => rest), questions: p.store.listOpenQuestions(), lastDecision: p.store.listGateLogs(1)[0] ?? null, busy: this.busy, error: this.lastError, version: VERSION };
+    return { goal: p.store.getGoal(this.clock()), live: p.store.getLive(), session: p.store.getSession(), paused: p.store.getPreferences().paused, sources: p.sources(), observable: p.observableSources(), counts: p.store.countInsights(), observations: p.store.latestObservations(8).map(({ payload: _payload, signature: _signature, ...rest }) => rest), questions: p.store.listOpenQuestions(), lastDecision: p.store.listGateLogs(1)[0] ?? null, busy: this.busy, error: this.lastError, version: VERSION, captureScript: captureScriptPath() };
   }
   async tick(): Promise<void> {
     const status = this.status();
