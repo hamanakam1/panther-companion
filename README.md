@@ -51,7 +51,7 @@ Importing does not create tickets, execute work, or grant delivery authority. In
 
 ## Follow a task
 
-**Follow this task** reads configured JSONL sources every four seconds for 25 minutes by default. It starts only after you set a goal. Each complete line is consumed once per running host; partial lines wait for a newline. File truncation or replacement resets the reader. A poll reads at most 1 MiB, retains all valid events in that batch, and reasons over the newest 25.
+**Follow this task** reads configured JSONL sources every four seconds for 25 minutes by default. It starts only after you set a goal. Each complete line is consumed once per running host; partial lines wait for a newline. File truncation or replacement resets the reader. A poll reads at most 1 MiB, retains all valid events in that batch, and reasons over the newest 25. Each line is limited to 64 KiB. Incomplete UTF-8 text is retained as bytes until a complete line arrives; an oversized line is skipped through its ending newline, so its tail cannot become a separate event.
 
 Configure only sources you intend to share with Companion:
 
@@ -65,7 +65,9 @@ Example terminal event, one JSON object per newline:
 {"command":"npm test","exitCode":1,"stderr":"Cannot find module","stdout":"","timestamp":"2026-10-24T12:00:00Z"}
 ```
 
-Other optional sources are `PANTHER_BROWSER_LOG` and `PANTHER_AGENT_LOG`. They read explicitly configured files; they do not observe the desktop automatically. Source status says configured or not configured. A configured file is not proof that a fresh event is available.
+Other optional sources are `PANTHER_BROWSER_LOG` and `PANTHER_AGENT_LOG`. They read explicitly configured files; they do not observe the desktop automatically. Configuration and readiness are separate. The interface distinguishes a source that has not been checked, a readable file waiting for events, an incomplete line, received records, malformed records, and an unavailable file. Missing or unreadable sources show a recovery message instead of an unqualified Following status. Valid records from other sources continue to work.
+
+Readiness is cached metadata from actual reads: last attempt, last successful file read, and last received record, with safe error categories and counts. Opening or refreshing the interface does not probe files; Pause does not read them. Explicit **Explain again**, **Prepare a decision**, or **Follow** actions update readiness, as do reads during an active bounded Follow session. After repairing a producer or file, the next permitted read shows recovery. Malformed-record warnings remain visible through empty polls until a subsequent clean read receives valid data, or a replaced/truncated file is read. A readable empty file is waiting for events, not evidence that work succeeded. Readiness resets to unchecked when the host restarts, and no file paths or source contents are added to diagnostics.
 
 Follow ends at its deadline or when you click **End follow**. Closing a browser tab does not stop the local HTTP service or its active Follow session; use **End follow** or **Pause** first when you want observation to stop. Quitting the desktop app stops its process. A process restart never silently resumes Follow. Pausing also ends active polling; resuming does not restart follow. **Prepare a decision** is a one-shot brief at your explicit pause, not another background mode.
 

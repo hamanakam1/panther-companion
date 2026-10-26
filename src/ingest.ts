@@ -63,6 +63,10 @@ export class Panther {
     return this.adapters.map((adapter) => adapter.status());
   }
 
+  sourceReadiness() {
+    return this.adapters.map((adapter) => adapter.readiness());
+  }
+
   /** One-shot "Explain this": capture now, run the gate, render the schema. */
   async explain(options: IngestOptions = {}): Promise<IngestResult> {
     return this.ingest({ ...options, onRequest: true });

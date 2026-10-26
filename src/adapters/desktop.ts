@@ -20,6 +20,10 @@ export class DesktopCaptureAdapter extends Adapter {
     return [];
   }
 
+  readiness() {
+    return { ...super.readiness(), state: "unsupported" as const };
+  }
+
   status(): string {
     return "desktop: not wired (optional adapter)";
   }

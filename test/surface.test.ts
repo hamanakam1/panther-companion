@@ -1,6 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { TerminalAdapter } from "../src/adapters/terminal.js";
+import type { Adapter } from "../src/adapters/adapter.js";
 import { createContext, runInContext } from "node:vm";
 import { Store } from "../src/state/store.js";
 import { Panther } from "../src/ingest.js";
@@ -41,8 +45,8 @@ class Element {
 function intent(title = "Review shipping preference") {
   return { schema: "https://github.com/hamanakam1/panther-intent-capture#intent-bundle", schema_version: "1.2", producer: "panther-intent-capture", authority: { export_only: true, requires_review: true, execution_authorized: false }, recording: { id: "surface-capture", title, stated_goal: "Preserve the shipping option", source_url: "https://example.test/settings" }, tickets: [{ id: "proposal-one", title, evidence: "Producer reports one Save click. Persisted value is unknown.", hypothesis: "Save may not persist the option.", steps_to_reproduce: ["Click Save"], suggested_verification_steps: ["Check the saved value after reload"], acceptance_criteria: [], questions: [], status: "draft", requires_review: true, execution_authorized: false }] };
 }
-async function surface() {
-  const p = new Panther({ store: Store.memory(), adapters: [], reasoner: new LocalReasoner(), threshold: .25, followMinutes: 25, insightTtlMinutes: 45 });
+async function surface(adapters: Adapter[] = []) {
+  const p = new Panther({ store: Store.memory(), adapters, reasoner: new LocalReasoner(), threshold: .25, followMinutes: 25, insightTtlMinutes: 45 });
   const controller = new CompanionController(p);
   const elements = new Map<string, Element>();
   for (const match of html.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)) {
@@ -199,6 +203,33 @@ describe("Companion first-use and import surface", () => {
       assert.equal(ui.$("connection-notice").hidden,false); assert.equal(ui.$("attach").disabled,true);
       ui.intercept(null); await ui.$("retry").click();
       assert.equal(ui.$("connection-notice").hidden,true); assert.equal(ui.$("attach").disabled,false);
+    } finally {ui.close();}
+  });
+  it("shows unavailable Follow honestly, keeps manual actions available, and recovers after a real read", async () => {
+    const dir=mkdtempSync(join(tmpdir(),"panther-surface-source-")), path=join(dir,"sensitive-path.jsonl");
+    const ui=await surface([new TerminalAdapter(path)]); try {
+      await setGoal(ui); assert.match(ui.$("sources").textContent,/not checked in this process/);
+      await ui.$("follow").click();
+      assert.equal(ui.$("status-text").textContent,"Source needs attention");
+      assert.equal(ui.$("connection-status").dataset.tone,"warning");
+      assert.equal(ui.$("session-bar").dataset.tone,"warning");
+      assert.match(ui.$("source-warning").textContent,/file not found.*Follow will retry automatically/);
+      assert.ok(!ui.$("source-warning").textContent.includes(path));
+      assert.equal(ui.$("attach").disabled,false); assert.equal(ui.$("import").disabled,false);
+      writeFileSync(path,'{"command":"npm test","exitCode":1,"stderr":"Synthetic failure"}\n');
+      await ui.run("refresh()"); assert.equal(ui.$("status-text").textContent,"Source needs attention");
+      await ui.controller.tick(); await ui.run("refresh()");
+      assert.equal(ui.$("status-text").textContent,"Following"); assert.equal(ui.$("source-warning").hidden,true);
+      assert.match(ui.$("sources").textContent,/Last received record:/);
+      await ui.controller.tick(); await ui.run("refresh()"); assert.equal(ui.$("status-text").textContent,"Waiting for evidence");
+    } finally {ui.close();rmSync(dir,{recursive:true,force:true});}
+  });
+  it("treats an older host's configured string as unchecked rather than healthy",async()=>{
+    const ui=await surface(); try {
+      const legacy={...ui.controller.status(),sources:["terminal: configured"],sourceReadiness:undefined,session:{status:"active",endsAt:"2026-10-26T05:00:00Z"}};
+      await ui.run("render("+JSON.stringify(legacy)+")");
+      assert.equal(ui.$("status-text").textContent,"Waiting for evidence");
+      assert.match(ui.$("sources").textContent,/configured; not checked/);
     } finally {ui.close();}
   });
   it("routine successful terminal evidence stays quiet and offers a new result instead of an empty-state loop", async () => {

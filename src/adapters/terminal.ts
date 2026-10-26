@@ -33,10 +33,14 @@ export class TerminalAdapter extends Adapter {
     return Boolean(this.logPath);
   }
 
+  readiness() {
+    return this.logPath ? { id: this.id, configured: true, ...this.cursor.status() } : super.readiness();
+  }
+
   async capture(options?: IngestOptions): Promise<Observation[]> {
     const now = options?.now ?? new Date().toISOString();
     if (!this.logPath) return [];
-    const events = this.readNewFileEvents();
+    const events = this.cursor.read(this.logPath, now);
     return events.map((event) => this.eventToObservation(event, now));
   }
 
@@ -57,10 +61,6 @@ export class TerminalAdapter extends Adapter {
     if (!this.logPath) return () => {};
     const watcher = watch(this.logPath, () => onChange());
     return () => watcher.close();
-  }
-
-  private readNewFileEvents(): Array<Record<string, unknown>> {
-    return this.cursor.read(this.logPath!);
   }
 
   private async readStdinEvents(): Promise<Array<Record<string, unknown>>> {

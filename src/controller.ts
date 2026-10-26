@@ -22,7 +22,7 @@ export class CompanionController {
     p.store.expireDue(this.clock());
     const session = p.store.getSession();
     if (session?.status === "active" && session.endsAt <= this.clock()) { p.invalidate(); p.store.saveSession({ ...session, status: "ended" }); }
-    return { goal: p.store.getGoal(this.clock()), live: p.store.getLive(), session: p.store.getSession(), paused: p.store.getPreferences().paused, sources: p.sources(), counts: p.store.countInsights(), observations: p.store.latestObservations(8).map(({ payload: _payload, signature: _signature, ...rest }) => rest), questions: p.store.listOpenQuestions(), lastDecision: p.store.listGateLogs(1)[0] ?? null, busy: this.busy, error: this.lastError, version: "1.1.1" };
+    return { goal: p.store.getGoal(this.clock()), live: p.store.getLive(), session: p.store.getSession(), paused: p.store.getPreferences().paused, sources: p.sources(), sourceReadiness: p.sourceReadiness(), counts: p.store.countInsights(), observations: p.store.latestObservations(8).map(({ payload: _payload, signature: _signature, ...rest }) => rest), questions: p.store.listOpenQuestions(), lastDecision: p.store.listGateLogs(1)[0] ?? null, busy: this.busy, error: this.lastError, version: "1.1.1" };
   }
   async tick(): Promise<void> {
     const status = this.status();

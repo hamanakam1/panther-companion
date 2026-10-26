@@ -1,5 +1,21 @@
 import { randomUUID } from "node:crypto";
 import type { Observation } from "../domain.js";
+
+export type SourceReadState = "not-configured" | "unsupported" | "not-checked" | "waiting" | "partial" | "invalid" | "ready" | "unavailable";
+export type SourceReadError = "missing" | "permission" | "not-file" | "unreadable";
+export type SourceReadiness = {
+  id: string;
+  configured: boolean;
+  state: SourceReadState;
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  lastEvidenceAt: string | null;
+  recordsRead: number;
+  recordsSkipped: number;
+  partialLine: boolean;
+  hasMore: boolean;
+  error: SourceReadError | null;
+};
 import { normalizeSignature } from "../core/text.js";
 
 export interface IngestOptions {
@@ -52,6 +68,11 @@ export abstract class Adapter {
   /** Log-friendly summary of what this adapter can capture right now. */
   status(): string {
     return `${this.id}: ${this.supports() ? "configured" : "not configured"}`;
+  }
+
+  /** Cached metadata only: asking for status must never probe or read a source. */
+  readiness(): SourceReadiness {
+    return { id: this.id, configured: this.supports(), state: this.supports() ? "not-checked" : "not-configured", lastAttemptAt: null, lastSuccessAt: null, lastEvidenceAt: null, recordsRead: 0, recordsSkipped: 0, partialLine: false, hasMore: false, error: null };
   }
 }
 

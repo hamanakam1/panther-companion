@@ -31,9 +31,13 @@ export class BrowserAdapter extends Adapter {
     return Boolean(this.logPath);
   }
 
+  readiness() {
+    return this.logPath ? { id: this.id, configured: true, ...this.cursor.status() } : super.readiness();
+  }
+
   async capture(options?: IngestOptions): Promise<Observation[]> {
     const now = options?.now ?? new Date().toISOString();
-    const events = this.logPath ? this.readFileEvents() : [];
+    const events = this.logPath ? this.cursor.read(this.logPath, now) : [];
     return events.map((event) => this.eventToObservation(event, now));
   }
 
@@ -47,10 +51,6 @@ export class BrowserAdapter extends Adapter {
     if (!this.logPath) return () => {};
     const watcher = watch(this.logPath, () => onChange());
     return () => watcher.close();
-  }
-
-  private readFileEvents(): Array<Record<string, unknown>> {
-    return this.cursor.read(this.logPath!);
   }
 
   private eventToObservation(

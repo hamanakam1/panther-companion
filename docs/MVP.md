@@ -8,7 +8,7 @@ The browser calls the same local controller as Electron. JSON writes are capped 
 
 | Method and path | Input | Result |
 | --- | --- | --- |
-| GET `/api/status` | None | Current goal, card, bounded recent context, sources, session, pause state |
+| GET `/api/status` | None | Current goal, card, bounded recent context, sources, cached sourceReadiness, session, pause state |
 | POST `/api/goal` | `{"hypothesis":"…"}` or null | New goal; current card and follow cleared |
 | POST `/api/observation` | `{"kind":"note","text":"…"}` | Attach and explain selected text |
 | POST `/api/observation` | `{"kind":"terminal","command":"…","exitCode":1,"text":"…"}` | Explain a command result; never execute it |
@@ -41,3 +41,9 @@ State mutations and their revision tokens are committed together. A reasoning re
 ## Product references
 
 Useful patterns were adapted to the local, explicit-context workflow: [Warp's selected-context changes](https://docs.warp.dev/changelog/2026), [Raycast's keyboard-first quickstart](https://manual.raycast.com/quickstart), and [Screenpipe's history search](https://docs.screenpi.pe/search-screen-history). Current scope uses explicit attachment, a focused action row and inspectable recent context. Screen recording, broad history search and automatic delivery remain outside this MVP.
+
+## Cached source readiness
+
+`GET /api/status` preserves the existing `sources: string[]` configuration summaries and adds `sourceReadiness`. Each item contains `id`, `configured`, `state`, `lastAttemptAt`, `lastSuccessAt`, `lastEvidenceAt`, `recordsRead`, `recordsSkipped`, `partialLine`, `hasMore`, and `error`. States are `not-configured`, `unsupported`, `not-checked`, `waiting`, `partial`, `invalid`, `ready`, and `unavailable`. Error categories are `missing`, `permission`, `not-file`, and `unreadable`; diagnostics never include the source path, file contents, or raw filesystem exception.
+
+These snapshots describe the last actual read in this host. Last success means the file was read, not that a valid event or successful task outcome was observed. Last evidence is the time a valid record was received and is retained separately through later empty or failed reads. Status queries perform no source I/O. Only explicit Explain/Prepare/Follow reads and active bounded Follow ticks update readiness; Pause, Resume, expired sessions, manual evidence, and bundle imports do not probe JSONL sources. Legacy hosts without the additive field appear unchecked in the current surface.
