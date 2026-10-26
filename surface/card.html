@@ -133,6 +133,8 @@ function renderGuidance(data) {
   let title, copy, label, action;
   if (data.paused) { title='Companion is paused'; copy='Your context stays here. Resume when you want to add evidence or ask for an explanation.'; label='Resume Companion'; action='resume'; }
   else if (!hasGoal) { title=data.goal.needsCorrection?'Update the goal for this task':'Start with the outcome you want'; copy='One sentence is enough. For example: “Make checkout save the selected shipping option.”'; label='Set your goal'; action='goal'; }
+  else if (data.live?.explanation.topic === 'reported-outcome') { title='Your reported outcome is ready to review'; copy='This is your recorded finding, not independent verification. Review it below, or attach a new result if more work is needed.'; label='Review your reported outcome'; action='outcome'; }
+  else if (data.live?.explanation.topic === 'decision-brief' && !data.live.explanation.decisionNeeded && !data.questions.length) { title='No open checks are waiting for this goal'; copy='This describes your recorded checks and does not verify that the work is complete. Continue with your goal, or attach a new result for another check.'; label='Attach a new result'; action='attach'; }
   else if (!hasEvidence) { title='Your goal is set. Add some evidence'; copy='Paste a note or a terminal result, or import an intent bundle below. Companion checks it against your goal.'; label='Attach evidence'; action='attach'; }
   else if (data.live) { title='Your next check is ready to review'; copy='Read the suggestion below and inspect its evidence. You choose whether to do it.'; label='Read the next check'; action='read'; }
   else if (data.lastDecision?.reason === 'routine success') { title='The latest result needs no interruption'; copy='The command succeeded. Keep working, and attach a new result when you need help.'; label='Attach a new result'; action='attach'; }
@@ -282,6 +284,7 @@ function guidedAction(action) {
   else if(action==='attach') $('attach').click();
   else if(action==='resume') $('pause').click();
   else if(action==='explain') $('explain').click();
+  else if(action==='outcome') { $('means').setAttribute('tabindex','-1'); $('means').scrollIntoView({block:'center'}); $('means').focus({preventScroll:true}); }
   else if(action==='read') { $('next-check').scrollIntoView({block:'center'}); $('next-check').focus({preventScroll:true}); }
 }
 $('guide-action').onclick=()=>guidedAction($('guide-action').dataset.action);

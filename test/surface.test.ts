@@ -284,6 +284,28 @@ function fillOutcome(ui: Awaited<ReturnType<typeof surface>>,resolution="resolve
 }
 
 describe("reported outcome surface",()=>{
+  it("guides reported outcomes and empty briefs without promising another open check",async()=>{
+    const ui=await surface();try {
+      await importForOutcome(ui);openFirstOutcome(ui);fillOutcome(ui);
+      await ui.$("outcome-form").onsubmit!({preventDefault(){}});
+      await ui.$("explain").click();
+      assert.equal(ui.$("guide-title").textContent,"Your reported outcome is ready to review");
+      assert.match(ui.$("guide-copy").textContent,/not independent verification/);
+      assert.equal(ui.$("guide-action").textContent,"Review your reported outcome");
+      ui.$("guide-action").click();assert.equal(ui.$("means").focused,true);
+      assert.equal(ui.$("means").attributes.tabindex,"-1");
+      await ui.$("dismiss").click();await ui.$("prepare").click();
+      assert.equal(ui.$("guide-title").textContent,"No open checks are waiting for this goal");
+      assert.match(ui.$("guide-copy").textContent,/does not verify that the work is complete/);
+      assert.equal(ui.$("guide-action").textContent,"Attach a new result");
+      ui.$("guide-action").click();assert.equal(ui.$("evidence-dialog").open,true);
+      ui.$("evidence-dialog").close();
+      await setGoal(ui,"A fresh goal with no evidence or recorded checks");await ui.$("prepare").click();
+      assert.equal(ui.controller.status().observations.length,0);
+      assert.equal(ui.$("guide-title").textContent,"No open checks are waiting for this goal");
+    }finally{ui.close();}
+  });
+
   it("requires note and deliberate status, retains still-open findings, then resolves without a repeated Prepare check",async()=>{
     const ui=await surface();try {
       await importForOutcome(ui);openFirstOutcome(ui);
