@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, appendFileSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, appendFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { once } from "node:events";
@@ -27,6 +27,13 @@ const failure: Observation = { id: "one", providerId: "terminal", capturedAt: NO
 function bundle() { return { schema: "https://github.com/hamanakam1/panther-intent-capture#intent-bundle", schema_version: "1.2", producer: "panther-intent-capture", authority: { export_only: true, requires_review: true, execution_authorized: false }, recording: { id: "capture-one", title: "Example capture", stated_goal: "Make checkout reliable", source_url: "https://example.test/checkout" }, tickets: [{ id: "draft-one", title: "Review checkout", evidence: "The producer reports three clicks", hypothesis: "The control may be stuck", steps_to_reproduce: ["Click Save"], suggested_verification_steps: ["Check whether Save submits once"], acceptance_criteria: ["Save submits once"], questions: [], status: "draft", requires_review: true, execution_authorized: false }] }; }
 
 describe("Companion MVP lifecycle", () => {
+  it("reports the released version so the surface can display it",()=>{
+    const {p,c}=make();try{
+      const shipped=(JSON.parse(readFileSync(new URL("../../package.json",import.meta.url),"utf8")) as {version:string}).version;
+      assert.match(shipped,/^\d+\.\d+\.\d+$/);
+      assert.equal(c.status().version,shipped);
+    }finally{p.store.close();}
+  });
   it("persists explanations through status and refreshes repeated evidence without duplicate insights", async () => {
     const {p,c}=make();
     try {
