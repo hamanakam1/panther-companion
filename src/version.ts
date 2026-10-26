@@ -5,4 +5,4 @@
  * single source of truth and every reported version (surface header, /api/status
  * and MCP serverInfo) follows one bump. test/mvp.test.ts fails if they diverge.
  */
-export const VERSION = "1.2.0";
+export const VERSION = "1.2.1";
