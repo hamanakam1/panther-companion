@@ -1,0 +1,74 @@
+{
+ "schema": "https://github.com/hamanakam1/panther-intent-capture#intent-bundle",
+ "schema_version": "1.2",
+ "producer": "panther-intent-capture",
+ "exported_at": 1793007071.327756,
+ "recording": {
+  "id": "capture-real-shape-01",
+  "source_url": "https://example.test/checkout",
+  "title": "Example captured session",
+  "stated_goal": "",
+  "capture_mode": "events",
+  "start_time": 1792979030.083,
+  "end_time": 1792979048.65,
+  "duration_ms": 18567,
+  "event_count": 1,
+  "screenshot_count": 0
+ },
+ "tickets": [
+  {
+   "id": "draft-real-shape-01",
+   "title": "Review browser session: Example captured session",
+   "description": "No intended outcome was supplied.\n\nThis draft summarizes recorded actions. Review the evidence and describe any bug or improvement before sending.",
+   "hypothesis": "",
+   "steps_to_reproduce": [
+    "navigation: https://example.test/checkout"
+   ],
+   "suggested_verification_steps": [],
+   "acceptance_criteria": [],
+   "desired_behavior": "",
+   "questions": [
+    "What should happen, and what happened instead?"
+   ],
+   "component": "unspecified",
+   "priority": "medium",
+   "evidence": "1 recorded event; no AI inference was performed.",
+   "evidence_refs": [
+    {
+     "kind": "event",
+     "event_index": 1,
+     "type": "navigation",
+     "timestamp_ms": 1792979030090
+    }
+   ],
+   "diagnostics": [],
+   "friction": [],
+   "screenshot_timestamps": [],
+   "source_url": "https://example.test/checkout",
+   "provenance": {
+    "origin": "observed_evidence",
+    "generation_revision": 4,
+    "evidence_kind": "observed_events",
+    "proposal_verified": false,
+    "producer": "panther-intent-capture",
+    "recording_id": "capture-real-shape-01",
+    "mode": "observed",
+    "model": null,
+    "event_count": 1,
+    "events_total": 1,
+    "events_truncated": false,
+    "screenshots_count": 0,
+    "media_analyzed": false,
+    "diagnostic_count": 0
+   },
+   "status": "draft",
+   "requires_review": true,
+   "execution_authorized": false
+  }
+ ],
+ "authority": {
+  "export_only": true,
+  "requires_review": true,
+  "execution_authorized": false
+ }
+}
