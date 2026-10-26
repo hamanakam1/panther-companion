@@ -4,34 +4,42 @@ import { mkdtempSync, writeFileSync, appendFileSync, rmSync, readFileSync } from
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { once } from "node:events";
+import { execFile } from "node:child_process";
 import { get } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Store } from "../src/state/store.js";
 import { Panther } from "../src/ingest.js";
 import { LocalReasoner, type Reasoner } from "../src/core/reasoner.js";
 import { CompanionController } from "../src/controller.js";
+import { VERSION } from "../src/version.js";
 import { parseIntentBundle } from "../src/bundle.js";
 import { createCompanionServer } from "../src/http.js";
 import { JsonlCursor } from "../src/adapters/jsonl.js";
 import { TerminalAdapter } from "../src/adapters/terminal.js";
 import { companionBounds } from "../src/electron/layout.js";
 import { isLoopbackUrl, normalizeConfig } from "../src/config.js";
+import type { Adapter } from "../src/adapters/adapter.js";
 import type { Observation, ReasonerOutput } from "../src/domain.js";
 
 const NOW = "2026-10-24T12:00:00.000Z";
-function make(reasoner: Reasoner = new LocalReasoner()) {
-  const p = new Panther({ store: Store.memory(), adapters: [], reasoner, threshold: .25, followMinutes: 25, insightTtlMinutes: 45 });
+function make(reasoner: Reasoner = new LocalReasoner(), adapters: Adapter[] = []) {
+  const p = new Panther({ store: Store.memory(), adapters, reasoner, threshold: .25, followMinutes: 25, insightTtlMinutes: 45 });
   return { p, c: new CompanionController(p, () => NOW) };
 }
 const failure: Observation = { id: "one", providerId: "terminal", capturedAt: NOW, label: "npm test", locator: "selected", summary: "npm test failed", payload: { command: "npm test", exitCode: 1, stderr: "Cannot find module" }, signature: "failure-one" };
 function bundle() { return { schema: "https://github.com/hamanakam1/panther-intent-capture#intent-bundle", schema_version: "1.2", producer: "panther-intent-capture", authority: { export_only: true, requires_review: true, execution_authorized: false }, recording: { id: "capture-one", title: "Example capture", stated_goal: "Make checkout reliable", source_url: "https://example.test/checkout" }, tickets: [{ id: "draft-one", title: "Review checkout", evidence: "The producer reports three clicks", hypothesis: "The control may be stuck", steps_to_reproduce: ["Click Save"], suggested_verification_steps: ["Check whether Save submits once"], acceptance_criteria: ["Save submits once"], questions: [], status: "draft", requires_review: true, execution_authorized: false }] }; }
 
+/** A configured source for tests whose subject is the session, not the honesty guard. */
+const followable = () => new TerminalAdapter(join(tmpdir(), "panther-configured-source.jsonl"));
+
 describe("Companion MVP lifecycle", () => {
-  it("reports the released version so the surface can display it",()=>{
+  it("reports one version from package.json through status, MCP and the surface",()=>{
     const {p,c}=make();try{
       const shipped=(JSON.parse(readFileSync(new URL("../../package.json",import.meta.url),"utf8")) as {version:string}).version;
       assert.match(shipped,/^\d+\.\d+\.\d+$/);
-      assert.equal(c.status().version,shipped);
+      assert.equal(VERSION,shipped,"src/version.ts drifted from package.json; run npm run build");
+      assert.equal(c.status().version,VERSION);
+      assert.match(readFileSync(new URL("../../surface/card.html",import.meta.url),"utf8"),/id="app-version"/,"surface no longer renders the version");
     }finally{p.store.close();}
   });
   it("persists explanations through status and refreshes repeated evidence without duplicate insights", async () => {
@@ -49,7 +57,7 @@ describe("Companion MVP lifecycle", () => {
     const {p,c}=make();try{await c.action("observation",{kind:"terminal",command:"npm test",exitCode:1,text:"Cannot find module"});await c.action("dismiss");await c.action("explain");assert.equal(c.status().live?.explanation.topic,"command-failure");}finally{p.store.close();}
   });
   it("changing the goal clears stale card and ends the follow session",async()=>{
-    const {p,c}=make();try{await c.action("goal",{hypothesis:"Fix npm test"});await c.action("follow");await p.ingestObservations([failure],{onRequest:true,now:NOW});await c.action("goal",{hypothesis:"Improve checkout"});assert.equal(c.status().live,null);assert.equal(c.status().session,null);assert.equal(c.status().questions.length,0);}finally{p.store.close();}
+    const {p,c}=make(new LocalReasoner(),[followable()]);try{await c.action("goal",{hypothesis:"Fix npm test"});await c.action("follow");await p.ingestObservations([failure],{onRequest:true,now:NOW});await c.action("goal",{hypothesis:"Improve checkout"});assert.equal(c.status().live,null);assert.equal(c.status().session,null);assert.equal(c.status().questions.length,0);}finally{p.store.close();}
   });
   it("a new goal does not inherit the previous task evidence or explanations",async()=>{
     const {p,c}=make();try{await c.action("goal",{hypothesis:"Project A build"});await c.action("observation",{kind:"terminal",command:"npm run build",exitCode:1,text:"Build failed"});await c.action("goal",{hypothesis:"Project B typography"});assert.equal(p.store.latestObservations().length,0);assert.equal(p.store.recentSummaries(10).length,0);await c.action("explain");assert.equal(c.status().live?.explanation.topic,"empty-capture");assert.equal((p.exportAll().observations as unknown[]).length,1);}finally{p.store.close();}
@@ -83,10 +91,10 @@ describe("Companion MVP lifecycle", () => {
     const {p,c}=make();try{await p.ingestObservations([failure],{onRequest:true,now:NOW});await c.action("feedback",{kind:"ExplainMechanism"});assert.equal(p.store.getPreferences().depthByTopic["command-failure"],"mechanism");await c.action("feedback",{kind:"AlreadyKnow"});assert.ok(p.store.getPreferences().knownSignatures.includes(failure.signature));await c.action("feedback",{kind:"WrongTask"});assert.equal(c.status().live,null);assert.equal(c.status().goal.needsCorrection,true);}finally{p.store.close();}
   });
   it("startup does not resume an active follow session",async()=>{
-    const {p,c}=make();try{await c.action("goal",{hypothesis:"Fix tests"});await c.action("follow");const restarted=new CompanionController(p,()=>NOW);assert.equal(restarted.status().session?.status,"paused");}finally{p.store.close();}
+    const {p,c}=make(new LocalReasoner(),[followable()]);try{await c.action("goal",{hypothesis:"Fix tests"});await c.action("follow");const restarted=new CompanionController(p,()=>NOW);assert.equal(restarted.status().session?.status,"paused");}finally{p.store.close();}
   });
   it("follow ends at its deadline",async()=>{
-    const {p,c}=make();try{await c.action("goal",{hypothesis:"Fix tests"});await c.action("follow");const later=new CompanionController(p,()=>NOW);p.store.saveSession({...p.store.getSession()!,status:"active",endsAt:NOW});assert.equal(later.status().session?.status,"ended");}finally{p.store.close();}
+    const {p,c}=make(new LocalReasoner(),[followable()]);try{await c.action("goal",{hypothesis:"Fix tests"});await c.action("follow");const later=new CompanionController(p,()=>NOW);p.store.saveSession({...p.store.getSession()!,status:"active",endsAt:NOW});assert.equal(later.status().session?.status,"ended");}finally{p.store.close();}
   });
   it("delete needs explicit exact confirmation",async()=>{
     const {p,c}=make();try{p.store.insertObservation(failure);await assert.rejects(c.action("delete",{confirm:true}),/DELETE/);assert.equal(p.store.latestObservations().length,1);await c.action("delete",{confirm:"DELETE"});assert.equal(p.store.latestObservations().length,0);}finally{p.store.close();}
@@ -142,6 +150,51 @@ describe("configured follow sources",()=>{
   it("bounded follow reads new terminal evidence and pause prevents further reads",async()=>{
     const dir=mkdtempSync(join(tmpdir(),"panther-follow-"));const path=join(dir,"events.jsonl");writeFileSync(path,"");const p=new Panther({store:Store.memory(),adapters:[new TerminalAdapter(path)],reasoner:new LocalReasoner(),threshold:.1,followMinutes:25,insightTtlMinutes:45});const c=new CompanionController(p);
     try{await c.action("goal",{hypothesis:"Fix npm test"});await c.action("follow");appendFileSync(path,JSON.stringify({command:"npm test",exitCode:1,stderr:"Missing module"})+"\n");await c.tick();assert.equal(c.status().live?.explanation.topic,"command-failure");await c.tick();assert.equal(p.store.latestObservations().length,1);await c.action("pause",{paused:true});appendFileSync(path,JSON.stringify({command:"npm run build",exitCode:1,stderr:"New error"})+"\n");await c.tick();assert.equal(p.store.latestObservations().length,1);}finally{p.store.close();rmSync(dir,{recursive:true,force:true});}
+  });
+  it("refuses follow out loud when no source can observe, instead of watching an empty room",async()=>{
+    const p=new Panther({store:Store.memory(),adapters:[new TerminalAdapter(null)],reasoner:new LocalReasoner(),threshold:.1,followMinutes:25,insightTtlMinutes:45});const c=new CompanionController(p,()=>NOW);
+    try{
+      assert.deepEqual(p.observableSources(),[]);
+      assert.deepEqual(c.status().observable,[],"status must not claim an observable source it does not have");
+      await c.action("goal",{hypothesis:"Fix npm test"});
+      await assert.rejects(()=>c.action("follow"),(err:Error)=>/No capture source is configured/.test(err.message)&&/capture-command\.sh/.test(err.message));
+      assert.equal(c.status().session,null,"a refused follow must not open a session");
+    }finally{p.store.close();}
+  });
+  it("counts a configured source as observable and keeps the shared default dark until it exists",()=>{
+    const dir=mkdtempSync(join(tmpdir(),"panther-observe-"));
+    const previous=process.env.PANTHER_HOME;process.env.PANTHER_HOME=dir;
+    try{
+      const adapter=new TerminalAdapter();
+      assert.equal(adapter.supports(),false,"the default file does not exist yet, so nothing is observable");
+      writeFileSync(join(dir,"terminal.jsonl"),"");
+      assert.equal(adapter.supports(),true,"the producer created the shared file, so the source is now live");
+      const p=new Panther({store:Store.memory(),adapters:[adapter,new TerminalAdapter(null)],reasoner:new LocalReasoner(),threshold:.1,followMinutes:25,insightTtlMinutes:45});
+      try{assert.deepEqual(p.observableSources(),["terminal"]);assert.deepEqual(p.sources(),["terminal: configured","terminal: not configured"]);}finally{p.store.close();}
+    }finally{if(previous===undefined)delete process.env.PANTHER_HOME;else process.env.PANTHER_HOME=previous;rmSync(dir,{recursive:true,force:true});}
+  });
+  it("turns a real wrapped command failure into a follow card through the shared producer",async()=>{
+    const dir=mkdtempSync(join(tmpdir(),"panther-producer-"));
+    const previousHome=process.env.PANTHER_HOME, previousLog=process.env.PANTHER_TERMINAL_LOG;
+    process.env.PANTHER_HOME=dir;delete process.env.PANTHER_TERMINAL_LOG;
+    try{
+      await new Promise<void>((resolve,reject)=>{
+        execFile("bash",[new URL("../../scripts/capture-command.sh",import.meta.url).pathname,"bash","-c","echo boom >&2; exit 3"],{env:{...process.env,PANTHER_HOME:dir}},(error)=>error&&(error as {code?:number}).code===3?resolve():reject(error??new Error("expected exit 3")));
+      });
+      const p=new Panther({store:Store.memory(),adapters:[new TerminalAdapter()],reasoner:new LocalReasoner(),threshold:.1,followMinutes:25,insightTtlMinutes:45});const c=new CompanionController(p,()=>NOW);
+      try{
+        assert.deepEqual(c.status().observable,["terminal"]);
+        await c.action("goal",{hypothesis:"Fix the failing command"});
+        await c.action("follow");
+        await c.tick();
+        assert.equal(c.status().live?.explanation.topic,"command-failure");
+        assert.match(JSON.stringify(c.status().live?.explanation),/boom/);
+      }finally{p.store.close();}
+    }finally{
+      if(previousHome===undefined)delete process.env.PANTHER_HOME;else process.env.PANTHER_HOME=previousHome;
+      if(previousLog===undefined)delete process.env.PANTHER_TERMINAL_LOG;else process.env.PANTHER_TERMINAL_LOG=previousLog;
+      rmSync(dir,{recursive:true,force:true});
+    }
   });
 });
 

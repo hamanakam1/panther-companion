@@ -63,6 +63,15 @@ export class Panther {
     return this.adapters.map((adapter) => adapter.status());
   }
 
+  /**
+   * Sources that can actually observe right now. Follow and any "watch this for
+   * me" claim must consult this: a host with nothing configured has to say so
+   * instead of polling an empty room.
+   */
+  observableSources(): string[] {
+    return this.adapters.filter((adapter) => adapter.supports()).map((adapter) => adapter.id);
+  }
+
   /** One-shot "Explain this": capture now, run the gate, render the schema. */
   async explain(options: IngestOptions = {}): Promise<IngestResult> {
     return this.ingest({ ...options, onRequest: true });

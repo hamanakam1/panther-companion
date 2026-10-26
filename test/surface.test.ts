@@ -5,6 +5,11 @@ import { createContext, runInContext } from "node:vm";
 import { Store } from "../src/state/store.js";
 import { Panther } from "../src/ingest.js";
 import { LocalReasoner } from "../src/core/reasoner.js";
+import { TerminalAdapter } from "../src/adapters/terminal.js";
+import type { Adapter } from "../src/adapters/adapter.js";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { CompanionController } from "../src/controller.js";
 
 const html = readFileSync(new URL("../../surface/card.html", import.meta.url), "utf8");
@@ -41,8 +46,8 @@ class Element {
 function intent(title = "Review shipping preference") {
   return { schema: "https://github.com/hamanakam1/panther-intent-capture#intent-bundle", schema_version: "1.2", producer: "panther-intent-capture", authority: { export_only: true, requires_review: true, execution_authorized: false }, recording: { id: "surface-capture", title, stated_goal: "Preserve the shipping option", source_url: "https://example.test/settings" }, tickets: [{ id: "proposal-one", title, evidence: "Producer reports one Save click. Persisted value is unknown.", hypothesis: "Save may not persist the option.", steps_to_reproduce: ["Click Save"], suggested_verification_steps: ["Check the saved value after reload"], acceptance_criteria: [], questions: [], status: "draft", requires_review: true, execution_authorized: false }] };
 }
-async function surface() {
-  const p = new Panther({ store: Store.memory(), adapters: [], reasoner: new LocalReasoner(), threshold: .25, followMinutes: 25, insightTtlMinutes: 45 });
+async function surface(adapters: Adapter[] = []) {
+  const p = new Panther({ store: Store.memory(), adapters, reasoner: new LocalReasoner(), threshold: .25, followMinutes: 25, insightTtlMinutes: 45 });
   const controller = new CompanionController(p);
   const elements = new Map<string, Element>();
   for (const match of html.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)) {
@@ -81,11 +86,18 @@ function paste(ui: Awaited<ReturnType<typeof surface>>, value: unknown) {
 }
 
 describe("Companion first-use and import surface", () => {
+  it("keeps Follow disabled while nothing can observe, and enables it the moment a source is configured", async () => {
+    const dir=mkdtempSync(join(tmpdir(),"panther-surface-src-"));const path=join(dir,"terminal.jsonl");writeFileSync(path,"");
+    try{
+      const dark=await surface(); try{await setGoal(dark);assert.equal(dark.$("follow").disabled,true);assert.match(dark.$("follow-help").textContent,/Follow needs a capture source/);assert.equal(dark.controller.status().observable.length,0);}finally{dark.close();}
+      const lit=await surface([new TerminalAdapter(path)]); try{await setGoal(lit);assert.equal(lit.$("follow").disabled,false);assert.match(lit.$("follow-help").textContent,/Follow reads configured sources/);}finally{lit.close();}
+    }finally{rmSync(dir,{recursive:true,force:true});}
+  });
   it("guides goal → evidence → next check, and explains retained evidence after dismissal", async () => {
     const ui=await surface(); try {
       assert.equal(ui.$("guide-action").textContent,"Set your goal");
       assert.equal(ui.$("follow").disabled,true);
-      assert.match(ui.$("follow-help").textContent,/Attaching evidence and importing bundles work now/);
+      assert.match(ui.$("follow-help").textContent,/scripts\/capture-command\.sh/,"the surface names the producer instead of leaving Follow a silent dead end");
       await setGoal(ui); assert.equal(ui.$("guide-action").textContent,"Attach evidence");
       ui.$("attach").click(); ui.$("evidence-input").value="The page shows a saved badge.\nNext useful check: Reload and inspect the selected value.";
       await ui.$("evidence-form").onsubmit!({preventDefault(){}});

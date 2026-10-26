@@ -10,6 +10,15 @@ export function pantherHome(): string {
   return process.env.PANTHER_HOME ?? join(homedir(), ".panther-companion");
 }
 
+/**
+ * Where the terminal capture producer appends JSONL, and where Companion reads
+ * it. Both sides share this one default so a wrapped command is visible without
+ * any extra configuration.
+ */
+export function terminalLogPath(): string {
+  return process.env.PANTHER_TERMINAL_LOG?.trim() || join(pantherHome(), "terminal.jsonl");
+}
+
 export function promptPath(): string {
   return join(projectRoot(), "prompts", "reasoner.md");
 }

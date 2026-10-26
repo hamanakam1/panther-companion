@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Panther } from "./ingest.js";
 import { FEEDBACK_KINDS, type FeedbackKind, type Observation } from "./domain.js";
 import { InputError, parseIntentBundle, record, text } from "./bundle.js";
+import { VERSION } from "./version.js";
 
 const now = () => new Date().toISOString();
 export class CompanionController {
@@ -22,7 +23,7 @@ export class CompanionController {
     p.store.expireDue(this.clock());
     const session = p.store.getSession();
     if (session?.status === "active" && session.endsAt <= this.clock()) { p.invalidate(); p.store.saveSession({ ...session, status: "ended" }); }
-    return { goal: p.store.getGoal(this.clock()), live: p.store.getLive(), session: p.store.getSession(), paused: p.store.getPreferences().paused, sources: p.sources(), counts: p.store.countInsights(), observations: p.store.latestObservations(8).map(({ payload: _payload, signature: _signature, ...rest }) => rest), questions: p.store.listOpenQuestions(), lastDecision: p.store.listGateLogs(1)[0] ?? null, busy: this.busy, error: this.lastError, version: "1.1.1" };
+    return { goal: p.store.getGoal(this.clock()), live: p.store.getLive(), session: p.store.getSession(), paused: p.store.getPreferences().paused, sources: p.sources(), observable: p.observableSources(), counts: p.store.countInsights(), observations: p.store.latestObservations(8).map(({ payload: _payload, signature: _signature, ...rest }) => rest), questions: p.store.listOpenQuestions(), lastDecision: p.store.listGateLogs(1)[0] ?? null, busy: this.busy, error: this.lastError, version: VERSION };
   }
   async tick(): Promise<void> {
     const status = this.status();
@@ -54,6 +55,7 @@ export class CompanionController {
       case "follow": return this.run(async () => {
         if (p.store.getPreferences().paused) throw new InputError("Resume Companion before starting Follow.");
         if (!p.store.getGoal(this.clock()).correctedByUser) throw new InputError("Set a goal before starting Follow.");
+        if (!p.observableSources().length) throw new InputError("No capture source is configured, so Follow has nothing to read. Attach evidence manually, or run a command through scripts/capture-command.sh and try again.");
         await p.follow({ now: this.clock() }); return this.status();
       });
       case "prepare": return this.run(async () => { await p.prepare({ now: this.clock(), naturalPause: true }); return this.status(); });

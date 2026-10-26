@@ -1,8 +1,9 @@
 import { JsonlCursor } from "./jsonl.js";
 import { createInterface } from "node:readline";
-import { watch } from "node:fs";
+import { existsSync, watch } from "node:fs";
 import type { Observation, IngestOptions } from "../domain.js";
 import { Adapter, observationSummary } from "./adapter.js";
+import { terminalLogPath } from "../paths.js";
 
 /**
  * TerminalAdapter — structured terminal events inspired by Warp.
@@ -15,28 +16,47 @@ import { Adapter, observationSummary } from "./adapter.js";
  * it has read up to and only returns new lines on subsequent captures, so a
  * long-running host can poll for live terminal events.
  *
- * Set PANTHER_TERMINAL_LOG to a JSONL path. Events can also be pushed
- * programmatically via inject(), or piped via the explicit captureStdin() call.
- * Use inject() to push events programmatically.
+ * The path comes from PANTHER_TERMINAL_LOG, falling back to
+ * `~/.panther-companion/terminal.jsonl` — the same file
+ * scripts/capture-command.sh appends to. Pass an explicit null to disable the
+ * source entirely. Events can also be pushed via inject(), or piped via the
+ * explicit captureStdin() call.
  */
 export class TerminalAdapter extends Adapter {
   readonly id = "terminal";
-  private readonly logPath: string | null;
+  /** "" means deliberately disabled; otherwise the explicit path, or null for the shared default. */
+  private readonly explicitPath: string | null;
   private readonly cursor = new JsonlCursor();
 
   constructor(logPath?: string | null) {
     super();
-    this.logPath = logPath ?? process.env.PANTHER_TERMINAL_LOG ?? null;
+    // `null` disables the source; an omitted argument falls back to the shared
+    // default file once it exists, so passing an explicit path is never needed
+    // just to pick up the producer's output.
+    this.explicitPath = logPath === null ? "" : logPath ?? (process.env.PANTHER_TERMINAL_LOG?.trim() || null);
+  }
+
+  /**
+   * The file this adapter will read right now. The shared default only counts
+   * as configured once it exists, so a host that has never captured anything
+   * reports "not configured" instead of silently following an empty room.
+   */
+  private logFilePath(): string | null {
+    if (this.explicitPath === "") return null;
+    if (this.explicitPath) return this.explicitPath;
+    const fallback = terminalLogPath();
+    return existsSync(fallback) ? fallback : null;
   }
 
   supports(): boolean {
-    return Boolean(this.logPath);
+    return this.logFilePath() !== null;
   }
 
   async capture(options?: IngestOptions): Promise<Observation[]> {
     const now = options?.now ?? new Date().toISOString();
-    if (!this.logPath) return [];
-    const events = this.readNewFileEvents();
+    const path = this.logFilePath();
+    if (!path) return [];
+    const events = this.cursor.read(path);
     return events.map((event) => this.eventToObservation(event, now));
   }
 
@@ -54,13 +74,10 @@ export class TerminalAdapter extends Adapter {
 
   /** Start watching the log file for changes. Caller must call stopWatcher(). */
   watchLogFile(onChange: () => void): () => void {
-    if (!this.logPath) return () => {};
-    const watcher = watch(this.logPath, () => onChange());
+    const path = this.logFilePath();
+    if (!path) return () => {};
+    const watcher = watch(path, () => onChange());
     return () => watcher.close();
-  }
-
-  private readNewFileEvents(): Array<Record<string, unknown>> {
-    return this.cursor.read(this.logPath!);
   }
 
   private async readStdinEvents(): Promise<Array<Record<string, unknown>>> {
