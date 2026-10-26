@@ -23,6 +23,20 @@ npm start
 
 The desktop window respects the chosen display's work area, including negative coordinates and the menu bar. It is resizable and does not stay above other apps. `Cmd/Ctrl+Shift+E` brings it forward. `Cmd/Ctrl+K` edits the goal while the panel has focus. `node scripts/launch-panther.js` launches the same maintained entry point after a build.
 
+### One surface writes at a time
+
+The panel, `npm run serve` and the MCP server all share one store, so exactly one of them writes it. The panel claims the store and serves `http://127.0.0.1:8765` from its own process, which means the desktop panel and the browser page are the same controller and cannot disagree about the goal, the card or the follow session. If `serve` already owns the store, the panel opens as a client of that server instead of opening the store a second time.
+
+Whoever comes second reads instead of writing, and says so in plain words rather than failing as a lock timeout:
+
+```
+Panther Companion: the store ~/.panther-companion/state.sqlite is already in use by
+Panther Companion panel (PID 1234, since 2026-10-26T09:22:10.844Z).
+Only one surface writes at a time. Use the surface that already owns it, or quit it and start this one again.
+```
+
+The claim is a lease file next to the store (`state.sqlite.writer`) with a heartbeat. Quitting releases it, a dead process is reclaimed immediately, and one that stops beating is reclaimed after 30 seconds. The panel also appends start-up and shutdown events to `~/.panther-companion/panel.log`, because a double-clicked app has no terminal to print to.
+
 ### Install as an app
 
 ```sh

@@ -22,12 +22,22 @@ import { OllamaReasoner } from "../src/reasoning/ollama.js";
 import { loadConfig } from "../src/config.js";
 import { pantherHome } from "../src/paths.js";
 import { VERSION } from "../src/version.js";
+import { claimWriter, describeHolder } from "../src/state/writer.js";
 import type { Observation } from "../src/domain.js";
 
 const HOME = pantherHome();
 const DEFAULT_DB = `${HOME}/state.sqlite`;
 const config = loadConfig(null);
-const store = Store.open(process.env.PANTHER_DB ?? DEFAULT_DB);
+const dbPath = process.env.PANTHER_DB ?? DEFAULT_DB;
+// MCP is a guest in the same store as the panel and the browser surface. When
+// another surface owns it, attach read-only and refuse the tools that write,
+// naming the owner, instead of racing it for the file.
+const claim = claimWriter(dbPath, "panther-mcp");
+const store = Store.open(dbPath, { readOnly: !claim.owned });
+const readOnlyReason = claim.owned
+  ? null
+  : `The Panther store is being written by ${claim.holder ? describeHolder(claim.holder) : "another surface"}. Reading still works; recording does not until that surface quits.`;
+process.on("exit", () => claim.release());
 const adapters = [new TerminalAdapter(), new BrowserAdapter(), new AgentEventAdapter()];
 const reasoner = config.reasoning.provider === "ollama"
   ? new OllamaReasoner(config.reasoning.ollamaUrl, config.reasoning.model, { fallbackToLocal: config.reasoning.fallbackToLocal })
@@ -45,6 +55,9 @@ function respond(id: Request["id"], result: unknown): Response {
 function errorResponse(id: Request["id"], code: number, message: string): Response {
   return { jsonrpc: "2.0", id, error: { code, message } };
 }
+
+/** Tools that change the store; refused while another surface owns it. */
+const WRITING_TOOLS = new Set(["panther_explain", "panther_feed_observation", "panther_feedback"]);
 
 const TOOLS: Array<{ name: string; description: string; inputSchema: { type: string; properties?: Record<string, unknown>; required?: string[] } }> = [
   { name: "panther_get_goal", description: "Read the current goal hypothesis", inputSchema: { type: "object", properties: {} } },
@@ -138,6 +151,10 @@ async function handleLine(line: string) {
         process.stdout.write(JSON.stringify(errorResponse(request.id, -32602, `unknown tool: ${name}`)) + "\n");
         return;
       }
+      if (readOnlyReason && WRITING_TOOLS.has(name)) {
+        process.stdout.write(JSON.stringify(errorResponse(request.id, -32000, readOnlyReason)) + "\n");
+        return;
+      }
       try {
         const value = await handler(args);
         result = { content: [{ type: "text", text: JSON.stringify(value) }], isError: false };
@@ -154,5 +171,12 @@ async function handleLine(line: string) {
   process.stdout.write(JSON.stringify(respond(request.id, result)) + "\n");
 }
 
-process.stdin.on("end", () => process.exit(0));
-process.stdin.on("error", () => process.exit(0));
+// A stdio client normally closes the pipe right after its last request. Exiting
+// immediately discards a pending stdout write, so the final answer would be cut
+// mid-line. Wait for the write to drain, then release the lease.
+function finish() {
+  claim.release();
+  process.stdout.write("", () => process.exit(0));
+}
+process.stdin.on("end", finish);
+process.stdin.on("error", finish);

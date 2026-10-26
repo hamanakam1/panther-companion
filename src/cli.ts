@@ -11,6 +11,7 @@ import { DesktopCaptureAdapter } from "./adapters/desktop.js";
 import { AgentEventAdapter } from "./adapters/agent.js";
 import { loadConfig } from "./config.js";
 import { pantherHome } from "./paths.js";
+import { claimWriter, describeHolder } from "./state/writer.js";
 import type { IngestResult } from "./domain.js";
 
 const HOME = pantherHome();
@@ -113,6 +114,15 @@ async function run() {
       break;
     }
     case "serve": {
+      // Exactly one process may write. A second server is refused in words
+      // rather than left to discover the collision as a lock timeout.
+      const claim = claimWriter(dbPath, "Panther Companion server");
+      if (!claim.owned) {
+        console.error(`Panther Companion: the store ${dbPath} is already in use by ${claim.holder ? describeHolder(claim.holder) : "another process"}.`);
+        console.error("Only one surface writes at a time. Use the surface that already owns it, or quit it and start this one again.");
+        process.exitCode = 1;
+        break;
+      }
       const p = panther(dbPath);
       const port = Number(process.env.PANTHER_PORT || 8765);
       if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("PANTHER_PORT must be a valid port.");
@@ -122,8 +132,8 @@ async function run() {
       server.listen(port, "127.0.0.1", () => {
         console.log(`Panther Companion: http://127.0.0.1:${port}`);
       });
-      server.on("error", error => { console.error(error.message); controller.stop(); process.exitCode = 1; });
-      const close = () => { controller.stop(); server.close(() => { p.store.close(); }); };
+      server.on("error", error => { console.error(error.message); claim.release(); controller.stop(); process.exitCode = 1; });
+      const close = () => { claim.release(); controller.stop(); server.close(() => { p.store.close(); }); };
       process.once("SIGTERM", close); process.once("SIGINT", close);
       break;
     }
