@@ -70,6 +70,9 @@ export abstract class Adapter {
     return `${this.id}: ${this.supports() ? "configured" : "not configured"}`;
   }
 
+  /** Optional configuration discovery for an explicit read action. */
+  refreshAvailability(): void {}
+
   /** Cached metadata only: asking for status must never probe or read a source. */
   readiness(): SourceReadiness {
     return { id: this.id, configured: this.supports(), state: this.supports() ? "not-checked" : "not-configured", lastAttemptAt: null, lastSuccessAt: null, lastEvidenceAt: null, recordsRead: 0, recordsSkipped: 0, partialLine: false, hasMore: false, error: null };

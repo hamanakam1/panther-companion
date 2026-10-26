@@ -85,11 +85,18 @@ function paste(ui: Awaited<ReturnType<typeof surface>>, value: unknown) {
 }
 
 describe("Companion first-use and import surface", () => {
+  it("keeps Follow disabled while nothing can observe, and enables it the moment a source is configured", async () => {
+    const dir=mkdtempSync(join(tmpdir(),"panther-surface-src-"));const path=join(dir,"terminal.jsonl");writeFileSync(path,"");
+    try{
+      const dark=await surface(); try{await setGoal(dark);assert.equal(dark.$("follow").disabled,true);assert.match(dark.$("follow-help").textContent,/Follow needs a capture source/);assert.equal(dark.controller.status().observable.length,0);}finally{dark.close();}
+      const lit=await surface([new TerminalAdapter(path)]); try{await setGoal(lit);assert.equal(lit.$("follow").disabled,false);assert.match(lit.$("follow-help").textContent,/Configured sources have not been checked/);}finally{lit.close();}
+    }finally{rmSync(dir,{recursive:true,force:true});}
+  });
   it("guides goal → evidence → next check, and explains retained evidence after dismissal", async () => {
     const ui=await surface(); try {
       assert.equal(ui.$("guide-action").textContent,"Set your goal");
       assert.equal(ui.$("follow").disabled,true);
-      assert.match(ui.$("follow-help").textContent,/Attaching evidence and importing bundles work now/);
+      assert.match(ui.$("follow-help").textContent,/scripts\/capture-command\.sh/,"the surface names the producer instead of leaving Follow a silent dead end");
       await setGoal(ui); assert.equal(ui.$("guide-action").textContent,"Attach evidence");
       ui.$("attach").click(); ui.$("evidence-input").value="The page shows a saved badge.\nNext useful check: Reload and inspect the selected value.";
       await ui.$("evidence-form").onsubmit!({preventDefault(){}});
@@ -204,6 +211,23 @@ describe("Companion first-use and import surface", () => {
       ui.intercept(null); await ui.$("retry").click();
       assert.equal(ui.$("connection-notice").hidden,true); assert.equal(ui.$("attach").disabled,false);
     } finally {ui.close();}
+  });
+  it("guides a new default producer through Explain again before enabling Follow without status probes",async()=>{
+    const dir=mkdtempSync(join(tmpdir(),"panther-default-surface-")), oldHome=process.env.PANTHER_HOME, oldLog=process.env.PANTHER_TERMINAL_LOG;
+    process.env.PANTHER_HOME=dir; delete process.env.PANTHER_TERMINAL_LOG;
+    const ui=await surface([new TerminalAdapter()]);
+    try {
+      await setGoal(ui); assert.equal(ui.$("follow").disabled,true);
+      assert.match(ui.$("follow-help").textContent,/capture-command\.sh.*Explain again to check/);
+      writeFileSync(join(dir,"terminal.jsonl"),'{"command":"npm test","exitCode":1,"stderr":"Synthetic failure"}\n');
+      await ui.run("refresh()"); assert.equal(ui.$("follow").disabled,true);
+      await ui.$("explain").click(); assert.equal(ui.$("follow").disabled,false);
+      assert.match(ui.$("sources").textContent,/1 record received/);
+      assert.equal(ui.$("app-version").textContent,"v"+ui.controller.status().version);
+    } finally {
+      ui.close();if(oldHome===undefined)delete process.env.PANTHER_HOME;else process.env.PANTHER_HOME=oldHome;
+      if(oldLog===undefined)delete process.env.PANTHER_TERMINAL_LOG;else process.env.PANTHER_TERMINAL_LOG=oldLog;rmSync(dir,{recursive:true,force:true});
+    }
   });
   it("shows unavailable Follow honestly, keeps manual actions available, and recovers after a real read", async () => {
     const dir=mkdtempSync(join(tmpdir(),"panther-surface-source-")), path=join(dir,"sensitive-path.jsonl");

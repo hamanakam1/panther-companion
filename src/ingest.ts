@@ -67,6 +67,16 @@ export class Panther {
     return this.adapters.map((adapter) => adapter.readiness());
   }
 
+  /** Cached configured candidates, not a claim that their next read will succeed. */
+  observableSources(): string[] {
+    return this.adapters.filter((adapter) => adapter.supports()).map((adapter) => adapter.id);
+  }
+
+  /** Called only for an explicit read action, never status or Pause/Resume. */
+  refreshSourceAvailability(): void {
+    for (const adapter of this.adapters) adapter.refreshAvailability();
+  }
+
   /** One-shot "Explain this": capture now, run the gate, render the schema. */
   async explain(options: IngestOptions = {}): Promise<IngestResult> {
     return this.ingest({ ...options, onRequest: true });

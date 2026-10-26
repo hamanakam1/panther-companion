@@ -67,7 +67,7 @@ function sourceReadiness() {
   // An older host only knows configuration. Never turn that into a health claim.
   return (current?.sources || []).map(source => ({id:source.split(':')[0],configured:source.endsWith(': configured'),state:source.endsWith(': configured')?'not-checked':source.includes(': not wired')?'unsupported':'not-configured'}));
 }
-function hasSources() { return sourceReadiness().some(source => source.configured); }
+function hasSources() { return Array.isArray(current?.observable) ? current.observable.length > 0 : sourceReadiness().some(source => source.configured); }
 function sourceLabel(source) { return ({terminal:'Terminal',browser:'Browser',agent:'Agent',desktop:'Desktop'})[source.id] || source.id; }
 function sourceMessage(source) {
   if (source.state==='unavailable') {
@@ -92,7 +92,7 @@ function renderSources(data) {
   const sources=sourceReadiness(), configured=sources.filter(source=>source.configured);
   const issues=configured.filter(source=>source.state==='unavailable'||source.state==='invalid');
   const active=data.session?.status==='active';
-  if (!configured.length) $('follow-help').textContent='Follow is unavailable until a source is configured. Attaching evidence and importing bundles work now.';
+  if (!configured.length) $('follow-help').textContent=`Follow needs a capture source. No terminal events have been discovered yet. Run a command through ${data.captureScript || 'scripts/capture-command.sh'}, then choose Explain again to check. Attaching evidence and importing bundles work right now.`;
   else if (data.paused) $('follow-help').textContent='Paused: no source is being read. The source details below describe earlier reads.';
   else if (issues.length) $('follow-help').textContent=active?'Follow will retry until its deadline. Attaching evidence and importing bundles still work.':'Check the producing tool, then use Explain again or Follow to retry. Manual evidence and imports still work.';
   else if (configured.some(source=>source.state==='not-checked')) $('follow-help').textContent='Configured sources have not been checked in this process. Explain again or Follow reads them; opening this page does not.';
@@ -102,6 +102,7 @@ function renderSources(data) {
   $('source-warning').hidden=!warnings.length; $('source-warning').textContent=warnings.join(' ');
   list('sources',sources.map(source=>`${sourceLabel(source)}: ${sourceMessage(source)}.${source.lastAttemptAt?' Last attempt: '+sourceTime(source.lastAttemptAt)+'.':''}${source.lastSuccessAt?' Last successful read: '+sourceTime(source.lastSuccessAt)+'.':''}${source.lastEvidenceAt?' Last received record: '+sourceTime(source.lastEvidenceAt)+'.':''}`),'No external sources configured. Manual evidence and Intent Capture imports work independently.');
 }
+
 function setWorking(value) {
   busy = value;
   const waiting = busy || !!current?.busy;
@@ -145,6 +146,7 @@ function render(data) {
   $('goal-context').textContent = data.goal.needsCorrection ? 'Marked as the wrong task. Edit the goal to continue.' : data.goal.correctedByUser ? 'Your stated goal · Edit it whenever the task changes.' : 'Set the outcome you want. Companion will keep it in view.';
   const active = data.session?.status === 'active'; $('session-bar').hidden = !active; $('session-text').textContent = active ? `${followStatus()} · Ends ${formatTime(data.session.endsAt)}` : '';
   renderSources(data);
+
   renderGuidance(data);
   const live = data.live;
   $('card').hidden = !live; $('empty').hidden = !!live;

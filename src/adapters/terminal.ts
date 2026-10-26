@@ -1,8 +1,9 @@
 import { JsonlCursor } from "./jsonl.js";
 import { createInterface } from "node:readline";
-import { watch } from "node:fs";
+import { existsSync, watch } from "node:fs";
 import type { Observation, IngestOptions } from "../domain.js";
 import { Adapter, observationSummary } from "./adapter.js";
+import { terminalLogPath } from "../paths.js";
 
 /**
  * TerminalAdapter — structured terminal events inspired by Warp.
@@ -15,31 +16,47 @@ import { Adapter, observationSummary } from "./adapter.js";
  * it has read up to and only returns new lines on subsequent captures, so a
  * long-running host can poll for live terminal events.
  *
- * Set PANTHER_TERMINAL_LOG to a JSONL path. Events can also be pushed
- * programmatically via inject(), or piped via the explicit captureStdin() call.
- * Use inject() to push events programmatically.
+ * The path comes from PANTHER_TERMINAL_LOG, falling back to
+ * `~/.panther-companion/terminal.jsonl` — the same file
+ * scripts/capture-command.sh appends to. Pass an explicit null to disable the
+ * source entirely. Events can also be pushed via inject(), or piped via the
+ * explicit captureStdin() call.
  */
 export class TerminalAdapter extends Adapter {
   readonly id = "terminal";
+  /** "" disables capture; null chooses the shared producer's default path. */
+  private readonly explicitPath: string | null;
   private readonly logPath: string | null;
+  private available: boolean;
   private readonly cursor = new JsonlCursor();
 
   constructor(logPath?: string | null) {
     super();
-    this.logPath = logPath ?? process.env.PANTHER_TERMINAL_LOG ?? null;
+    this.explicitPath = logPath === null ? "" : logPath ?? (process.env.PANTHER_TERMINAL_LOG?.trim() || null);
+    this.logPath = this.explicitPath === "" ? null : this.explicitPath ?? terminalLogPath();
+    this.available = Boolean(this.explicitPath);
+    this.refreshAvailability();
   }
 
-  supports(): boolean {
-    return Boolean(this.logPath);
+  /**
+   * Discover the shared file at startup or an explicit read, never in status.
+   * Once discovered it stays configured: later removal must surface as a read
+   * failure, rather than make an active Follow silently forget the source.
+   */
+  refreshAvailability(): void {
+    if (this.explicitPath === null && !this.available && this.logPath) this.available = existsSync(this.logPath);
   }
+
+  supports(): boolean { return this.available; }
 
   readiness() {
-    return this.logPath ? { id: this.id, configured: true, ...this.cursor.status() } : super.readiness();
+    return this.available ? { id: this.id, configured: true, ...this.cursor.status() } : super.readiness();
   }
 
   async capture(options?: IngestOptions): Promise<Observation[]> {
     const now = options?.now ?? new Date().toISOString();
-    if (!this.logPath) return [];
+    this.refreshAvailability();
+    if (!this.available || !this.logPath) return [];
     const events = this.cursor.read(this.logPath, now);
     return events.map((event) => this.eventToObservation(event, now));
   }
@@ -58,7 +75,8 @@ export class TerminalAdapter extends Adapter {
 
   /** Start watching the log file for changes. Caller must call stopWatcher(). */
   watchLogFile(onChange: () => void): () => void {
-    if (!this.logPath) return () => {};
+    this.refreshAvailability();
+    if (!this.available || !this.logPath) return () => {};
     const watcher = watch(this.logPath, () => onChange());
     return () => watcher.close();
   }

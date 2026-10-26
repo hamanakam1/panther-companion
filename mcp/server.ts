@@ -21,6 +21,7 @@ import { LocalReasoner } from "../src/core/reasoner.js";
 import { OllamaReasoner } from "../src/reasoning/ollama.js";
 import { loadConfig } from "../src/config.js";
 import { pantherHome } from "../src/paths.js";
+import { VERSION } from "../src/version.js";
 import type { Observation } from "../src/domain.js";
 
 const HOME = pantherHome();
@@ -123,7 +124,7 @@ async function handleLine(line: string) {
       result = {
         protocolVersion: "2024-11-05",
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: "panther-companion", version: "1.1.1" },
+        serverInfo: { name: "panther-companion", version: VERSION },
       };
     } else if (request.method === "ping") {
       result = {};

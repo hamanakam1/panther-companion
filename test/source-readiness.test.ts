@@ -93,6 +93,49 @@ describe("source read readiness",()=>{
       }
     } finally {f.close();}
   });
+  it("discovers a new shared default only on an explicit read, retains failures after removal, and preserves null disable",async()=>{
+    const f=fixture(), oldHome=process.env.PANTHER_HOME, oldLog=process.env.PANTHER_TERMINAL_LOG;
+    process.env.PANTHER_HOME=f.dir; delete process.env.PANTHER_TERMINAL_LOG;
+    const path=join(f.dir,"terminal.jsonl"), adapter=new TerminalAdapter(), disabled=new TerminalAdapter(null);
+    const p=new Panther({store:Store.memory(),adapters:[adapter],reasoner:new LocalReasoner(),threshold:.25,followMinutes:25,insightTtlMinutes:45});
+    const c=new CompanionController(p,()=>T1);
+    try {
+      await c.action("goal",{hypothesis:"Check a wrapped command"});
+      assert.deepEqual(c.status().observable,[]); assert.equal(adapter.readiness().state,"not-configured");
+      await assert.rejects(c.action("follow"),/No capture source/); assert.equal(c.status().session,null);
+      await c.action("pause",{paused:true});
+      writeFileSync(path,'{"command":"first","exitCode":1,"stderr":"First failure"}\n');
+      c.status(); await c.tick(); await c.action("explain"); await c.action("prepare");
+      assert.equal(adapter.supports(),false); assert.equal(adapter.readiness().lastAttemptAt,null);
+      await c.action("pause",{paused:false}); await c.tick(); assert.equal(adapter.supports(),false);
+      await c.action("explain"); assert.deepEqual(c.status().observable,["terminal"]); assert.equal(adapter.readiness().state,"ready");
+      assert.equal(c.status().observations.length,1);
+      assert.deepEqual(await disabled.capture({now:T1}),[]); assert.equal(disabled.supports(),false);
+      await c.action("follow"); renameSync(path,path+".old");
+      assert.equal(c.status().sourceReadiness[0].state,"waiting","status must not notice a file disappearing");
+      await c.tick(); assert.equal(adapter.readiness().error,"missing"); assert.equal(adapter.supports(),true);
+      writeFileSync(path,'{"command":"second","exitCode":1,"stderr":"Second failure"}\n');
+      assert.equal(c.status().sourceReadiness[0].state,"unavailable");
+      await c.tick(); assert.equal(adapter.readiness().state,"ready"); assert.equal(c.status().observations.length,2);
+    } finally {
+      c.stop();p.store.close(); if(oldHome===undefined)delete process.env.PANTHER_HOME;else process.env.PANTHER_HOME=oldHome;
+      if(oldLog===undefined)delete process.env.PANTHER_TERMINAL_LOG;else process.env.PANTHER_TERMINAL_LOG=oldLog;f.close();
+    }
+  });
+  it("the explicit Follow action discovers a producer-created default before applying the no-source guard",async()=>{
+    const f=fixture(), oldHome=process.env.PANTHER_HOME, oldLog=process.env.PANTHER_TERMINAL_LOG;
+    process.env.PANTHER_HOME=f.dir; delete process.env.PANTHER_TERMINAL_LOG;
+    const adapter=new TerminalAdapter();
+    const p=new Panther({store:Store.memory(),adapters:[adapter],reasoner:new LocalReasoner(),threshold:.25,followMinutes:25,insightTtlMinutes:45});const c=new CompanionController(p,()=>T1);
+    try {
+      await c.action("goal",{hypothesis:"Follow the producer"});
+      writeFileSync(join(f.dir,"terminal.jsonl"),""); assert.equal(c.status().observable.length,0);
+      await c.action("follow"); assert.equal(c.status().session?.status,"active"); assert.equal(adapter.readiness().state,"waiting");
+    } finally {
+      c.stop();p.store.close(); if(oldHome===undefined)delete process.env.PANTHER_HOME;else process.env.PANTHER_HOME=oldHome;
+      if(oldLog===undefined)delete process.env.PANTHER_TERMINAL_LOG;else process.env.PANTHER_TERMINAL_LOG=oldLog;f.close();
+    }
+  });
   it("status, Pause, Resume and an expired Follow session never read; explicit reads recover independently of manual evidence",async()=>{
     const f=fixture(); let time=T1;
     const adapter=new TerminalAdapter(f.path);
