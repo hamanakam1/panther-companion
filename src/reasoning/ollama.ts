@@ -23,6 +23,9 @@ export class OllamaReasoner implements Reasoner {
   }
 
   async reason(input: ReasonerInput): Promise<ReasonerOutput> {
+    // Empty decision queues are known local state, not a model inference or a
+    // provider fallback. A resolved check must not be invented again by Prepare.
+    if (input.brief && !input.openQuestions.length) return reasonLocally(input);
     // Match local reasoning's current-result view without removing stored history.
     input = { ...input, observations: currentEvidence(input.observations) };
     const prompt = this.promptTemplate(input);

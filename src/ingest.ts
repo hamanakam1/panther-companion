@@ -7,6 +7,7 @@ import type {
   Insight,
   Observation,
   Preferences,
+  ReasonerInput,
   Session,
   SurfaceCard,
 } from "./domain.js";
@@ -15,7 +16,7 @@ import { decideGate, scoreNovelty, scorePreference, scoreRelevance, routineFrom 
 import { unsetGoal } from "./core/goal.js";
 import { groupKeyFor } from "./core/insights.js";
 import { addMinutes } from "./core/text.js";
-import { Reasoner } from "./core/reasoner.js";
+import { Reasoner, reasonLocally, reportedOutcome } from "./core/reasoner.js";
 import { Adapter } from "./adapters/adapter.js";
 import { randomUUID } from "node:crypto";
 import { questionTextFor } from "./core/reasoner.js";
@@ -194,7 +195,7 @@ export class Panther {
     observations = observations.slice(-DEFAULT_LIMIT);
 
     // Reason over the captured evidence (local first, ollama optional).
-    const output = await this.reasoner.reason({
+    const input: ReasonerInput = {
       goal,
       observations,
       openQuestions: questions,
@@ -203,7 +204,14 @@ export class Panther {
       now,
       brief: options.sessionMode === "prepare",
       returnToTask: options.sessionMode === "follow",
-    });
+    };
+    const canonical = reasonLocally(input);
+    const resolved = options.sessionMode === "prepare" ? null : this.store.resolvedOutcomeForCheck(goal.id, canonical.nextCheck, canonical.usedObservationIds);
+    // Recording a resolution is explicit local state, not a hidden provider
+    // fallback. Do not ask any provider to resurrect that same old check.
+    const output = resolved ? reportedOutcome(canonical, resolved)
+      : options.sessionMode === "prepare" && !questions.length ? canonical
+      : await this.reasoner.reason(input);
     if (generation !== this.store.stateRevision()) return this.quiet("request cancelled by a state change");
     return this.store.withStateRevision<IngestResult>(generation, () => {
       const allowedEvidence = new Set([...observations.map(obs => obs.id), ...questions.flatMap(question => question.observationIds)]);
@@ -288,7 +296,7 @@ export class Panther {
       if (existing) this.store.updateInsight(insight, signatures);
       else this.store.insertInsight(insight, signatures);
       const question = questionTextFor(output);
-      if (question && output.topic !== "decision-brief") this.store.insertQuestion({ id: randomUUID(), text: question, observationIds: output.usedObservationIds, status: "open", createdAt: now, updatedAt: now });
+      if (question && output.topic !== "decision-brief" && output.topic !== "interrupted-task") this.store.insertQuestion({ id: randomUUID(), text: question, observationIds: output.usedObservationIds, goalId: goal.id, canonicalCheck: { text: canonical.nextCheck, observationIds: canonical.usedObservationIds }, contextObservationIds: observations.map(obs => obs.id), status: "open", createdAt: now, updatedAt: now });
 
       const live: SurfaceCard | null = decision.updateLive
         ? {

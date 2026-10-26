@@ -23,8 +23,9 @@
 </section>
 <section class="panel"><div class="row between"><h2>Evidence for this goal</h2><span id="context-count" class="muted">No evidence yet</span></div><p class="muted" style="margin:8px 0 14px">Choose the context you want explained. Companion uses it to suggest a next check when one is needed.</p><div class="toolbar"><button id="attach" data-work>＋ Attach evidence</button><button id="import" data-connected>Import from Intent Capture</button></div><details id="context-details"><summary>Review selected evidence</summary><div id="recent"></div></details></section>
 <section class="panel" aria-labelledby="insight-label"><div class="row between"><h2 id="insight-label">What matters now</h2><span id="topic" class="chip">Ready when you are</span></div><div id="empty" class="empty"><div class="symbol" aria-hidden="true">▤</div><h3 id="empty-title">A little context goes a long way.</h3><p id="empty-copy">Set a goal, then attach selected evidence or import an Intent Capture bundle. Companion will help you find the next useful check.</p><button id="empty-attach" class="ghost" data-connected>Attach evidence</button></div><article id="card" hidden><div class="explanation" style="margin-top:18px"><div><div class="section-label">What it means</div><p id="means"></p></div><div><div class="section-label">Why it matters here</div><p id="why"></p></div></div><div class="next"><div class="section-label">Your next check</div><p id="next-check" tabindex="-1"></p></div><p id="card-meta" class="muted"></p><details><summary>Observed, inferred, and still unknown</summary><div class="knowledge"><h3>Observed</h3><ul id="observed"></ul></div><div class="knowledge inferred"><h3>Inferred · check before relying on it</h3><ul id="inferred"></ul></div><div class="knowledge unknown"><h3>Unknown</h3><ul id="unknown"></ul></div></details><details><summary id="refs-label">Evidence sources</summary><ul id="refs"></ul></details><div class="feedback" aria-label="Explanation feedback"><button data-feedback="UsefulMoreLikeThis">Useful</button><button data-feedback="AlreadyKnow">Already know</button><button data-feedback="WrongTask">Wrong task</button><button data-feedback="ExplainMechanism">More detail</button><button data-feedback="UsefulButLater">Later</button><button id="dismiss" class="ghost">Dismiss</button></div></article></section>
+<section class="panel" aria-labelledby="checks-title"><div class="row between"><h2 id="checks-title">Open checks</h2><span id="checks-count" class="chip">0 open</span></div><p class="muted">Record what you found, then decide whether a check is resolved or still open. These are your reports, not independent verification.</p><div id="open-checks" class="stack"></div><p id="checks-empty" class="muted"></p><p id="legacy-checks" class="notice" hidden></p><details id="outcome-history-details"><summary>Your reported outcomes</summary><div id="outcome-history"></div><p class="help">Recent reports for this goal. All reports and earlier goals stay in exported local history.</p></details></section>
 <section aria-label="More Companion actions" class="stack"><div class="modes"><button id="explain" data-work>Explain again<span>Use current goal context</span></button><button id="follow" data-work>Follow this task<span>Read configured sources</span></button><button id="prepare" data-work>Prepare a decision<span>Summarize open questions</span></button></div><p id="follow-help" class="mode-help"></p><div id="source-warning" class="notice error" role="alert" hidden></div><div id="session-bar" class="row between" hidden><span id="session-text"></span><button id="stop" class="small ghost" data-connected>End follow</button></div></section>
-<section class="panel"><details id="help-details" style="margin:0;border:0;padding:0"><summary>How Companion works</summary><ol class="help-list muted"><li><strong>Set a goal.</strong> Describe the outcome you want. Changing it starts a fresh context; earlier evidence stays in exported history.</li><li><strong>Add evidence.</strong> Paste a note, a terminal result that already happened, or an intent bundle from Intent Capture. No screen recording starts and no commands run here.</li><li><strong>Choose your next check.</strong> Read the suggestion and inspect its sources. You decide whether to do it; Companion does not execute it or mark it complete.</li></ol><p class="muted"><strong>Explain again</strong> uses the current goal's evidence. <strong>Prepare a decision</strong> summarizes stored questions. <strong>Follow</strong> reads only explicitly configured sources until its deadline. <strong>Pause</strong> stops new reads; resume does not restart Follow.</p></details><details><summary>Sources &amp; local history</summary><ul id="sources"></ul><p class="muted">Use End follow or Pause to stop updates. Closing a browser tab leaves the local service running, so Follow continues until its deadline. Quitting the desktop app stops its process. Restarting a host never resumes Follow automatically. History includes previous goals and may contain sensitive text you selected.</p><div class="toolbar" style="margin-top:12px"><button id="export" class="small" data-connected>Export local history</button><button id="delete" class="small danger ghost" data-connected>Delete local history</button></div></details></section>
+<section class="panel"><details id="help-details" style="margin:0;border:0;padding:0"><summary>How Companion works</summary><ol class="help-list muted"><li><strong>Set a goal.</strong> Describe the outcome you want. Changing it starts a fresh context; earlier evidence stays in exported history.</li><li><strong>Add evidence.</strong> Paste a note, a terminal result that already happened, or an intent bundle from Intent Capture. No screen recording starts and no commands run here.</li><li><strong>Choose your next check.</strong> Read the suggestion and inspect its sources. You decide whether to do it. Use Record outcome to save what you found and mark the check Resolved or Still open; Companion does not execute the check or verify your report.</li></ol><p class="muted"><strong>Explain again</strong> uses the current goal's evidence. <strong>Prepare a decision</strong> summarizes stored questions. <strong>Follow</strong> reads only explicitly configured sources until its deadline. <strong>Pause</strong> stops new reads; resume does not restart Follow.</p></details><details><summary>Sources &amp; local history</summary><ul id="sources"></ul><p class="muted">Use End follow or Pause to stop updates. Closing a browser tab leaves the local service running, so Follow continues until its deadline. Quitting the desktop app stops its process. Restarting a host never resumes Follow automatically. History includes previous goals and may contain sensitive text you selected.</p><div class="toolbar" style="margin-top:12px"><button id="export" class="small" data-connected>Export local history</button><button id="delete" class="small danger ghost" data-connected>Delete local history</button></div></details></section>
 <footer class="footer"><span>Local first · Suggestions stay in your control</span><span id="updated">Not connected</span></footer>
 </main>
 <dialog id="goal-dialog"><form id="goal-form"><h2>What are you working toward?</h2><label>A clear outcome<textarea id="goal-input" maxlength="2000" required placeholder="Make the checkout flow reliable and easy to understand"></textarea></label><p class="help">Keep it specific. Changing the goal clears the current explanation and ends any follow session.</p><div class="actions"><button type="button" data-close>Cancel</button><button class="primary" type="submit" data-connected>Save goal</button></div></form></dialog>
@@ -35,10 +36,11 @@
 <div id="bundle-paste-panel" hidden><label>Full intent bundle JSON<textarea id="bundle-text" maxlength="1048576" spellcheck="false" placeholder='{"schema": "…", "schema_version": "1.2", …}'></textarea></label><p class="help">Use Copy intent bundle in Intent Capture, then paste here and choose Preview bundle. If copying is unavailable, download the bundle, open the .json file as text, and copy all its contents. Your clipboard is read only when you paste.</p></div>
 <p class="help import-note">Up to 25 proposals · 1 MiB maximum · Preview adds nothing to your history.</p><div class="row" style="margin:14px 0"><button id="preview-bundle">Preview bundle</button><span id="preview-status" class="muted" role="status" aria-live="polite"></span></div>
 <div id="import-preview" hidden class="stack"><div class="notice" id="bundle-summary"></div><p id="bundle-goal" class="muted"></p><p id="bundle-current-goal" class="muted"></p><label class="checkbox"><input id="use-goal" type="checkbox">Use the captured goal as my current goal</label><p class="help">Changing the goal clears the current explanation and ends Follow. Leave this unchecked to keep your current goal.</p><details open><summary>Review what will be added</summary><ul id="bundle-proposals"></ul></details><p class="help">Evidence summaries are producer-reported, not independently verified. Import does not create tickets, run checks, or authorize work.</p></div><div class="actions"><button data-close>Cancel</button><button id="confirm-import" class="primary" disabled>Import proposals</button></div></dialog>
+<dialog id="outcome-dialog" aria-labelledby="outcome-title"><form id="outcome-form" class="stack"><h2 id="outcome-title">Record outcome</h2><p id="outcome-question"></p><p id="outcome-state" class="notice" role="status" aria-live="polite" hidden></p><button id="resume-outcome" type="button" class="small" data-connected hidden>Resume Companion</button><label>What did you find?<textarea id="outcome-note" maxlength="3000" required placeholder="Describe what you checked, what happened, and anything still uncertain."></textarea></label><label>Does this check need more attention?<select id="outcome-resolution" required><option value="">Choose a status</option><option value="resolved">Resolved — stop reminding me about this check</option><option value="still-open">Still open — more checking is needed</option></select></label><p class="help">Saved as your report, not independently verified. Resolved closes this check only; it does not verify success or accept a ticket. Negative or inconclusive findings can stay open.</p><div class="actions"><button type="button" data-close>Cancel</button><button id="save-outcome" class="primary" type="submit" data-work>Save reported outcome</button></div></form></dialog>
 <dialog id="delete-dialog"><form id="delete-form"><h2>Delete local Companion history?</h2><p class="muted">This removes goals, selected evidence, explanations, and feedback from this Companion store. Export anything you want to keep first.</p><label style="margin-top:16px">Type DELETE to confirm<input id="delete-confirm" autocomplete="off" required pattern="DELETE"></label><div class="actions"><button type="button" data-close>Cancel</button><button class="danger" type="submit">Delete local history</button></div></form></dialog>
 <script>
 const $ = id => document.getElementById(id);
-let current = null, busy = false, connected = false, bundle = null, bundleGeneration = 0, bundleMode = 'file', previewBusy = false, noticeTimer;
+let current = null, busy = false, connected = false, bundle = null, bundleGeneration = 0, bundleMode = 'file', previewBusy = false, noticeTimer, outcomeDraft = null;
 async function api(action, data = {}) {
   if (window.pantherAPI) return window.pantherAPI.action(action, data);
   const read = action === 'status' || action === 'export';
@@ -108,6 +110,7 @@ function setWorking(value) {
   const waiting = busy || !!current?.busy;
   document.querySelectorAll('[data-work]').forEach(el => el.disabled = waiting || !connected || !!current?.paused);
   document.querySelectorAll('[data-connected]').forEach(el => el.disabled = waiting || !connected);
+  document.querySelectorAll('[data-outcome]').forEach(el=>el.disabled ||= !!current?.goal.needsCorrection);
   $('follow').disabled ||= !current?.goal.correctedByUser || !hasSources();
   $('confirm-import').disabled = waiting || !connected || !!current?.paused || !bundle;
   $('confirm-import').textContent = current?.paused ? 'Resume Companion to import' : bundle ? `Import ${bundle.tickets.length} proposal${bundle.tickets.length === 1 ? '' : 's'}` : 'Import proposals';
@@ -121,6 +124,7 @@ function setWorking(value) {
   $('preview-bundle').disabled = waiting || !connected || previewBusy;
   for (const id of ['bundle-file', 'bundle-text', 'bundle-source-file', 'bundle-source-paste']) $(id).disabled = waiting;
   $('guide-action').disabled = waiting || !connected;
+  renderOutcomeState(waiting);
 }
 function renderGuidance(data) {
   const hasGoal = data.goal.correctedByUser && !data.goal.needsCorrection, hasEvidence = data.observations.length > 0;
@@ -148,10 +152,11 @@ function render(data) {
   renderSources(data);
 
   renderGuidance(data);
+  renderChecks(data);
   const live = data.live;
   $('card').hidden = !live; $('empty').hidden = !!live;
   if (live) {
-    const e = live.explanation; $('topic').textContent = live.producedBy === 'prepare' ? 'Decision brief' : 'Evidence explained'; $('means').textContent = e.whatItMeans; $('why').textContent = e.whyItMattersHere; $('next-check').textContent = e.nextCheck;
+    const e = live.explanation; $('topic').textContent = e.topic === 'reported-outcome' ? 'Your reported outcome' : live.producedBy === 'prepare' ? 'Decision brief' : 'Evidence explained'; $('means').textContent = e.whatItMeans; $('why').textContent = e.whyItMattersHere; $('next-check').textContent = e.nextCheck;
     $('card-meta').textContent = `Based on selected evidence · ${formatTime(e.createdAt)} · ${e.evidence.length} source${e.evidence.length === 1 ? '' : 's'}`;
     list('observed', e.observed); list('inferred', e.inferred, 'No inference added.'); list('unknown', e.unknown); list('refs', e.evidence.map(ref => `${ref.label} — ${ref.providerId} · ${ref.locator}`)); $('refs-label').textContent = `Evidence sources (${e.evidence.length})`;
   } else {
@@ -166,6 +171,45 @@ function render(data) {
   if (!data.observations.length) { const p = document.createElement('p'); p.className='muted'; p.textContent='Evidence attached to this goal will appear here. Earlier goals remain in exported history.'; $('recent').append(p); }
   for (const observation of [...data.observations].reverse()) { const item=document.createElement('div'); item.className='evidence-item'; const meta=document.createElement('div'); meta.className='meta'; meta.textContent=`${observation.providerId} · ${formatTime(observation.capturedAt)}`; const p=document.createElement('p'); p.textContent=observation.summary.slice(0,600); item.append(meta,p); $('recent').append(item); }
   $('updated').textContent = 'Updated ' + formatTime(new Date()); setWorking(busy);
+}
+function renderChecks(data) {
+  const checks=(data.questions || []).filter(q=>q.goalId===data.goal.id && Number.isSafeInteger(q.revision));
+  const outcomes=data.questionOutcomes || [];
+  $('checks-count').textContent=`${checks.length} open`;
+  $('open-checks').replaceChildren();
+  $('checks-empty').textContent=checks.length?'':outcomes.length?'No open checks remain for this goal. This does not mean the work has been independently verified.':'Checks appear here when Companion identifies a question to follow up. Add evidence or import a proposal to begin.';
+  for(const q of checks) {
+    const item=document.createElement('div'); item.className='evidence-item';
+    const text=document.createElement('p'); text.textContent=q.text; item.append(text);
+    if(q.latestOutcome) { const note=document.createElement('p'); note.className='muted'; note.textContent=`Your last report · Still open: ${q.latestOutcome.note}`; item.append(note); }
+    const button=document.createElement('button'); button.className='small'; button.textContent='Record outcome'; button.setAttribute('data-work',''); button.setAttribute('data-outcome',''); button.disabled=busy || !connected || !!data.paused || !!data.goal.needsCorrection; button.onclick=()=>openOutcome(q); item.append(button); $('open-checks').append(item);
+  }
+  $('legacy-checks').hidden=!data.legacyQuestionCount;
+  $('legacy-checks').textContent=data.legacyQuestionCount?`${data.legacyQuestionCount} older ${data.legacyQuestionCount===1?'check has':'checks have'} no recorded goal link. ${data.legacyQuestionCount===1?'It remains':'They remain'} in exported history and ${data.legacyQuestionCount===1?'is':'are'} not assigned to this goal.`:'';
+  $('outcome-history').replaceChildren();
+  if(!outcomes.length) { const p=document.createElement('p'); p.className='muted'; p.textContent='No reported outcomes for this goal yet.'; $('outcome-history').append(p); }
+  for(const outcome of outcomes.slice(0,10)) {
+    const item=document.createElement('div'); item.className='evidence-item';
+    const meta=document.createElement('div'); meta.className='meta'; meta.textContent=`User-reported · ${outcome.resolution==='resolved'?'Resolved':'Still open'} · ${formatTime(outcome.createdAt)}`;
+    const question=document.createElement('p'); question.textContent=outcome.questionText;
+    const note=document.createElement('p'); note.textContent=outcome.note; item.append(meta,question,note); $('outcome-history').append(item);
+  }
+}
+function renderOutcomeState(waiting=busy) {
+  const q=(current?.questions || []).find(q=>q.id===outcomeDraft?.questionId);
+  const saved=(current?.questionOutcomes || []).find(outcome=>outcome.id===outcomeDraft?.requestId);
+  const stale=outcomeDraft && (current?.goal.id!==outcomeDraft.goalId || current?.goal.needsCorrection || !q || q.revision!==outcomeDraft.expectedRevision);
+  const message=!connected?'Connection unavailable. Your draft is still here; retry after reconnecting.':saved?'A report from this dialog was already saved. Close the dialog to review the saved outcome.':current?.paused?'Companion is paused. Resume to save your draft; this will not restart Follow.':stale?'This check or goal changed. Cancel this dialog and review the current checks.':waiting?'Saving your reported outcome…':'';
+  $('outcome-state').textContent=message; $('outcome-state').hidden=!message; $('resume-outcome').hidden=!current?.paused;
+  $('outcome-note').disabled=waiting; $('outcome-resolution').disabled=waiting;
+  $('save-outcome').disabled=waiting || !connected || !!current?.paused || !!stale || !!saved || !outcomeDraft;
+  $('save-outcome').textContent=current?.paused?'Resume Companion to save':'Save reported outcome';
+}
+function openOutcome(question) {
+  if(busy || !connected || current?.paused || question.goalId!==current?.goal.id) return;
+  outcomeDraft={questionId:question.id,goalId:question.goalId,expectedRevision:question.revision,requestId:crypto.randomUUID()};
+  $('outcome-question').textContent=question.text; $('outcome-note').value=''; $('outcome-resolution').value='';
+  openDialog('outcome-dialog'); renderOutcomeState(); $('outcome-note').focus();
 }
 async function refresh() {
   if (busy) return;
@@ -255,6 +299,19 @@ $('confirm-import').onclick=async()=>{
   try { const result=await perform('import',{bundle:candidate,useGoal}); if(generation===bundleGeneration) $('import-dialog').close(); notice(`${result.imported} proposal${result.imported===1?'':'s'} imported. ${useGoal?'Captured goal adopted.':'Your goal is unchanged.'} Review the next check; no work has been run.`); } catch {}
 };
 document.querySelectorAll('[data-feedback]').forEach(button=>button.onclick=async()=>{ try { await perform('feedback',{kind:button.dataset.feedback},'Feedback saved locally.'); if(button.dataset.feedback==='WrongTask') $('edit-goal').click(); if(button.dataset.feedback==='ExplainMechanism') await perform('explain'); } catch {} });
+$('outcome-dialog').addEventListener('close',()=>{outcomeDraft=null;});
+$('resume-outcome').onclick=()=>perform('pause',{paused:false},'Resumed. Your outcome has not been saved; review it before saving.').catch(()=>{});
+$('outcome-form').onsubmit=async event=>{
+  event.preventDefault(); if(!outcomeDraft || busy || $('save-outcome').disabled) return;
+  const note=$('outcome-note').value.trim(), resolution=$('outcome-resolution').value;
+  if(!note || !['resolved','still-open'].includes(resolution)) { notice('Describe what you found and choose Resolved or Still open before saving.',true); return; }
+  const draft=outcomeDraft;
+  try {
+    await perform('question-outcome',{...draft,note,resolution},resolution==='resolved'?'Your report was saved and this check is resolved. This is not independent verification.':'Your report was saved. The check remains open for more attention.');
+    if(outcomeDraft===draft) $('outcome-dialog').close();
+    $('outcome-history-details').open=true;
+  } catch {}
+};
 $('dismiss').onclick=()=>perform('dismiss',{},'Explanation dismissed. Selected evidence remains available.').catch(()=>{});
 $('export').onclick=async()=>{ try { const data=await api('export'); const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})); const a=document.createElement('a'); a.href=url; a.download='panther-companion.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); notice('Local history exported.'); } catch(error) { notice(error.message,true); } };
 $('delete').onclick=()=>{ $('delete-confirm').value=''; openDialog('delete-dialog'); };

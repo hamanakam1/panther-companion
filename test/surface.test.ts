@@ -1,4 +1,5 @@
 import { describe, it } from "node:test";
+import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -66,10 +67,10 @@ async function surface(adapters: Adapter[] = []) {
       getElementById: $,
       createElement: () => new Element(),
       querySelector: (selector: string) => selector === "dialog[open]" ? [...elements.values()].find(el => el.open) ?? null : null,
-      querySelectorAll: (selector: string) => [...elements.values()].filter(el => selector.split(",").some(part => part.startsWith("#") ? el.id === part.slice(1) : part.startsWith("[data-") && Object.hasOwn(el.attributes, part.slice(1,-1)))),
+      querySelectorAll: (selector: string) => [...elements.values()].flatMap(function flatten(el: Element): Element[] { return [el,...el.children.flatMap(flatten)]; }).filter(el => selector.split(",").some(part => part.startsWith("#") ? el.id === part.slice(1) : part.startsWith("[data-") && Object.hasOwn(el.attributes, part.slice(1,-1)))),
       addEventListener() {},
     },
-    TextEncoder, Date, URL, Blob, AbortSignal,
+    TextEncoder, Date, URL, Blob, AbortSignal, crypto: { randomUUID },
     setTimeout: () => 0, clearTimeout() {}, setInterval() {},
   });
   runInContext(script, context);
@@ -268,5 +269,79 @@ describe("Companion first-use and import surface", () => {
       assert.equal(ui.$("empty-title").textContent,"Your next check will appear here.");
       assert.equal(ui.$("guide-action").textContent,"Attach evidence");
     } finally {ui.close();}
+  });
+});
+
+async function importForOutcome(ui: Awaited<ReturnType<typeof surface>>) {
+  await setGoal(ui); paste(ui,intent()); await ui.$("preview-bundle").click(); await ui.$("confirm-import").click();
+}
+function openFirstOutcome(ui: Awaited<ReturnType<typeof surface>>) {
+  const item=ui.$("open-checks").children[0]; assert.ok(item,"An open check is visible");
+  item.children.at(-1)!.click(); assert.equal(ui.$("outcome-dialog").open,true);
+}
+function fillOutcome(ui: Awaited<ReturnType<typeof surface>>,resolution="resolved",note="I reloaded and the selected choice remained. This is my report.") {
+  ui.$("outcome-note").value=note; ui.$("outcome-resolution").value=resolution;
+}
+
+describe("reported outcome surface",()=>{
+  it("requires note and deliberate status, retains still-open findings, then resolves without a repeated Prepare check",async()=>{
+    const ui=await surface();try {
+      await importForOutcome(ui);openFirstOutcome(ui);
+      assert.equal(ui.$("outcome-resolution").value,"");
+      await ui.$("outcome-form").onsubmit!({preventDefault(){}});
+      assert.equal(ui.calls.filter(call=>call.action==="question-outcome").length,0);
+      fillOutcome(ui,"still-open","The retry failed; persisted state is still unknown.");
+      await ui.$("outcome-form").onsubmit!({preventDefault(){}});
+      assert.equal(ui.$("outcome-dialog").open,false);assert.match(ui.$("open-checks").textContent,/Your last report.*retry failed/);
+      assert.match(ui.$("outcome-history").textContent,/User-reported.*Still open/);
+      openFirstOutcome(ui);fillOutcome(ui);
+      const first=ui.$("outcome-form").onsubmit!({preventDefault(){}});const duplicate=ui.$("outcome-form").onsubmit!({preventDefault(){}});await Promise.all([first,duplicate]);
+      assert.equal(ui.controller.status().questions.length,0);assert.equal(ui.controller.status().questionOutcomes.length,2);
+      await ui.$("dismiss").click();await ui.$("prepare").click();assert.match(ui.$("means").textContent,/No open checks.*this goal/);
+      await ui.$("explain").click();assert.match(ui.$("observed").textContent,/User-reported outcome \(not independently verified\)/);
+      assert.match(ui.$("outcome-history").textContent,/Resolved/);
+    }finally{ui.close();}
+  });
+
+  it("retries an uncertain response with the same request identity and saves only once",async()=>{
+    const ui=await surface();try {
+      await importForOutcome(ui);openFirstOutcome(ui);fillOutcome(ui);
+      let lost=true;
+      ui.intercept(async(action,data)=>{const result=await ui.controller.action(action,data);if(action==="question-outcome"&&lost){lost=false;throw new Error("Response unavailable; retry.");}return result;});
+      await ui.$("outcome-form").onsubmit!({preventDefault(){}});
+      assert.equal(ui.$("outcome-dialog").open,true);assert.equal(ui.controller.status().questionOutcomes.length,1);
+      await ui.$("outcome-form").onsubmit!({preventDefault(){}});
+      const calls=ui.calls.filter(call=>call.action==="question-outcome");assert.equal(calls.length,2);assert.equal(calls[0].data.requestId,calls[1].data.requestId);
+      assert.equal(ui.controller.status().questionOutcomes.length,1);assert.equal(ui.$("outcome-dialog").open,false);
+    }finally{ui.close();}
+  });
+
+  it("invalidates a draft when its question or goal changes while keeping the typed note visible",async()=>{
+    const ui=await surface();try {
+      await importForOutcome(ui);openFirstOutcome(ui);fillOutcome(ui);
+      const q=ui.controller.status().questions[0];
+      await ui.controller.action("question-outcome",{requestId:randomUUID(),questionId:q.id,goalId:q.goalId,expectedRevision:q.revision,note:"Another report kept this open.",resolution:"still-open"});
+      await ui.run("refresh()");assert.equal(ui.$("save-outcome").disabled,true);assert.match(ui.$("outcome-state").textContent,/check or goal changed/);assert.ok(ui.$("outcome-note").value);
+      ui.$("outcome-dialog").close();openFirstOutcome(ui);fillOutcome(ui);
+      await ui.controller.action("goal",{hypothesis:"Different goal"});await ui.run("refresh()");
+      assert.equal(ui.$("save-outcome").disabled,true);await ui.$("outcome-form").onsubmit!({preventDefault(){}});
+      assert.equal(ui.calls.filter(call=>call.action==="question-outcome").length,0);
+    }finally{ui.close();}
+  });
+
+  it("pause before a delayed save is handled by the server and explicit resume preserves the draft without saving",async()=>{
+    const ui=await surface();try {
+      await importForOutcome(ui);openFirstOutcome(ui);fillOutcome(ui);
+      let release:(()=>void)|undefined;
+      ui.intercept(async(action,data)=>{if(action==="question-outcome")await new Promise<void>(resolve=>{release=resolve;});return ui.controller.action(action,data);});
+      const pending=ui.$("outcome-form").onsubmit!({preventDefault(){}});await flush();
+      assert.equal(ui.$("outcome-note").disabled,true,"the submitted note cannot be edited while its save is pending");
+      assert.equal(ui.$("outcome-resolution").disabled,true,"the submitted status cannot be edited while its save is pending");
+      await ui.controller.action("pause",{paused:true});release!();await pending;ui.intercept(null);await ui.run("refresh()");
+      assert.equal(ui.controller.status().questionOutcomes.length,0);assert.equal(ui.$("save-outcome").disabled,true);assert.equal(ui.$("resume-outcome").hidden,false);assert.ok(ui.$("outcome-note").value);
+      assert.equal(ui.$("outcome-note").disabled,false,"a failed save restores editable draft fields");
+      await ui.$("resume-outcome").click();assert.equal(ui.controller.status().questionOutcomes.length,0);assert.equal(ui.$("save-outcome").disabled,false);
+      await ui.$("outcome-form").onsubmit!({preventDefault(){}});assert.equal(ui.controller.status().questionOutcomes.length,1);
+    }finally{ui.close();}
   });
 });

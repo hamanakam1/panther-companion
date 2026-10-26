@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { Depth, Observation, ReasonerInput, ReasonerOutput } from "../domain.js";
+import type { Depth, Observation, QuestionOutcome, ReasonerInput, ReasonerOutput } from "../domain.js";
 import { isUnsetGoal } from "./goal.js";
 import { isRoutineSuccess } from "./routine.js";
 import { asRecord, excerpt, readString } from "./text.js";
@@ -31,6 +31,7 @@ export function buildReasoningPrompt(template: string, input: ReasonerInput): st
       id: question.id,
       text: question.text,
       observationIds: question.observationIds,
+      userReportedOutcome: question.latestOutcome ? { note: question.latestOutcome.note, resolution: question.latestOutcome.resolution, attribution: "user-reported, not independently verified" } : null,
     })),
     recentSummaries: input.recentSummaries,
   };
@@ -49,8 +50,22 @@ export class LocalReasoner implements Reasoner {
   }
 }
 
+/** Explicitly recorded state supersedes the identical old suggestion; this is
+ * attribution of the user's report, never independent outcome verification. */
+export function reportedOutcome(base: ReasonerOutput, outcome: QuestionOutcome): ReasonerOutput {
+  return {
+    whatItMeans: "You recorded a resolution for this check.",
+    whyItMattersHere: "This check is closed for the current goal because you marked it resolved. Your report remains in local history.",
+    nextCheck: "You marked this check resolved. Attach new evidence if another check is needed.",
+    usedObservationIds: base.usedObservationIds,
+    observed: [`Original check: ${outcome.questionText}`, `User-reported outcome (not independently verified): ${outcome.note}`],
+    inferred: [], unknown: ["Whether the reported result independently meets the goal or acceptance criteria."],
+    confidence: 0.9, topic: "reported-outcome", decisionNeeded: false, routineSuccess: false,
+  };
+}
+
 export function reasonLocally(input: ReasonerInput): ReasonerOutput {
-  if (input.brief && input.openQuestions.length) return brief(input);
+  if (input.brief) return brief(input);
   // Select current results for reasoning only; the store/export keeps history.
   input = { ...input, observations: currentEvidence(input.observations) };
   const mismatch = findMismatch(input.observations);
@@ -360,7 +375,7 @@ function returning(input: ReasonerInput): ReasonerOutput {
   const questions = input.openQuestions.filter((question) => question.status === "open");
   const ids = [...new Set(questions.flatMap((question) => question.observationIds))];
   const returnIds = input.observations.filter((obs) => asRecord(obs.payload)?.event === "return").map((obs) => obs.id);
-  const observed = questions.map((question) => `Open question, stored ${question.createdAt}: ${question.text}`);
+  const observed = questions.flatMap((question) => [`Open question, stored ${question.createdAt}: ${question.text}`, ...(question.latestOutcome ? [`User-reported outcome (not independently verified): ${question.latestOutcome.note}. The user kept this check open.`] : [])]);
   for (const obs of input.observations) {
     if (asRecord(obs.payload)?.event === "return") observed.push(`Return signal: ${obs.summary}`);
   }
@@ -384,6 +399,14 @@ function brief(input: ReasonerInput): ReasonerOutput {
   const questions = input.openQuestions.filter((question) => question.status === "open").slice(0, 3);
   const ids = [...new Set(questions.flatMap((question) => question.observationIds))];
   const lines = questions.map((question) => question.text);
+  if (!lines.length) return {
+    whatItMeans: "No open checks are waiting for this goal.",
+    whyItMattersHere: `${goalSentence(input)} This describes your recorded checks, not whether the work has independently succeeded.`,
+    nextCheck: "Continue with your goal, or attach new evidence if another check is needed.",
+    usedObservationIds: [], observed: ["There are no open, goal-scoped questions in local history."], inferred: [],
+    unknown: ["Whether the work meets its acceptance criteria; no independent verification is implied."],
+    confidence: 0.9, topic: "decision-brief", decisionNeeded: false, routineSuccess: false,
+  };
   return {
     whatItMeans: lines.length === 1
       ? `Decision waiting: ${lines[0]}`
@@ -391,7 +414,7 @@ function brief(input: ReasonerInput): ReasonerOutput {
     whyItMattersHere: `${goalSentence(input)} This brief was held until a pause so it would not cut into the work.`,
     nextCheck: lines.length === 1 ? `Decide this before continuing: ${lines[0]}` : "Decide the stored questions before continuing.",
     usedObservationIds: ids,
-    observed: lines.map((line) => `Stored question: ${line}`),
+    observed: questions.flatMap(question => [`Stored question: ${question.text}`, ...(question.latestOutcome ? [`User-reported outcome (not independently verified): ${question.latestOutcome.note}. The user kept this check open.`] : [])]),
     inferred: [],
     unknown: ["Which option you want. The capture does not contain the decision."],
     confidence: 0.66,

@@ -86,6 +86,14 @@ Producer-reported steps and evidence summaries are labeled **not independently v
 
 Importing does not create tickets, execute work, or grant delivery authority. Intent Capture can capture and review independently; Companion can use manually selected evidence independently.
 
+## Record what happened next
+
+Open checks for the current goal have a **Record outcome** action. Describe what you found, then explicitly choose **Resolved** or **Still open**. Negative results and uncertainty can stay open. The report is stored locally as user-reported, not independently verified; it does not run a command, accept a ticket, authorize work, or certify success.
+
+Resolved checks stop resurfacing in **Prepare a decision**. **Explain again** or reimporting the identical evidence shows your recorded outcome instead of repeating the old suggestion. A genuinely new capture can create a new check with the same wording. Simply attaching a note, dismissing a card, or marking feedback never infers resolution.
+
+The dialog protects against a changed goal/check, paused Companion, and repeat submissions. Resume is explicit and does not restart Follow or save the draft automatically. Recent outcomes appear under **Your reported outcomes**; the complete notes, original questions, evidence links, and earlier goals remain in exported history. Older questions without a stored goal link remain unassigned and visible as an older-history count; the migration does not silently attach them to the current goal.
+
 ## Follow a task
 
 **Follow this task** reads configured JSONL sources every four seconds for 25 minutes by default. It starts only after you set a goal. Each complete line is consumed once per running host; partial lines wait for a newline. File truncation or replacement resets the reader. A poll reads at most 1 MiB, retains all valid events in that batch, and reasons over the newest 25. Each line is limited to 64 KiB. Incomplete UTF-8 text is retained as bytes until a complete line arrives; an oversized line is skipped through its ending newline, so its tail cannot become a separate event.

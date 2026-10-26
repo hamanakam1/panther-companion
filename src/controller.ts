@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Panther } from "./ingest.js";
-import { FEEDBACK_KINDS, type FeedbackKind, type Observation } from "./domain.js";
+import { FEEDBACK_KINDS, type FeedbackKind, type Observation, type QuestionOutcome } from "./domain.js";
 import { InputError, parseIntentBundle, record, text } from "./bundle.js";
 import { VERSION } from "./version.js";
 import { captureScriptPath } from "./paths.js";
@@ -25,7 +25,7 @@ export class CompanionController {
     p.store.expireDue(this.clock());
     const session = p.store.getSession();
     if (session?.status === "active" && session.endsAt <= this.clock()) { p.invalidate(); p.store.saveSession({ ...session, status: "ended" }); }
-    return { goal: p.store.getGoal(this.clock()), live: p.store.getLive(), session: p.store.getSession(), paused: p.store.getPreferences().paused, sources: p.sources(), sourceReadiness: p.sourceReadiness(), observable: p.observableSources(), counts: p.store.countInsights(), observations: p.store.latestObservations(8).map(({ payload: _payload, signature: _signature, ...rest }) => rest), questions: p.store.listOpenQuestions(), lastDecision: p.store.listGateLogs(1)[0] ?? null, busy: this.busy, error: this.lastError, version: VERSION, captureScript: this.captureScript };
+    return { goal: p.store.getGoal(this.clock()), live: p.store.getLive(), session: p.store.getSession(), paused: p.store.getPreferences().paused, sources: p.sources(), sourceReadiness: p.sourceReadiness(), observable: p.observableSources(), counts: p.store.countInsights(), observations: p.store.latestObservations(8).map(({ payload: _payload, signature: _signature, ...rest }) => rest), questions: p.store.listOpenQuestions(), questionOutcomes: p.store.listQuestionOutcomes(), legacyQuestionCount: p.store.legacyQuestionCount(), lastDecision: p.store.listGateLogs(1)[0] ?? null, busy: this.busy, error: this.lastError, version: VERSION, captureScript: this.captureScript };
   }
   async tick(): Promise<void> {
     const status = this.status();
@@ -95,6 +95,35 @@ export class CompanionController {
         if (bundle.observations.length) await p.ingestObservations(bundle.observations, { onRequest: true, now: this.clock() });
         return { ...this.status(), imported: bundle.count };
       });
+      case "question-outcome": {
+        const questionId = text(data.questionId, "Check", 100, true);
+        const goalId = text(data.goalId, "Goal", 100, true);
+        const requestId = text(data.requestId, "Request", 100, true);
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) throw new InputError("Reopen Record outcome and try again.");
+        const note = text(data.note, "What you found", 3000, true);
+        if (data.resolution !== "resolved" && data.resolution !== "still-open") throw new InputError("Choose Resolved or Still open before saving.");
+        if (!Number.isSafeInteger(data.expectedRevision) || (data.expectedRevision as number) < 0) throw new InputError("This check changed. Reopen Record outcome to review it.");
+        const resolution = data.resolution;
+        const saved = p.store.transaction(() => {
+          if (p.store.getPreferences().paused) throw new InputError("Resume Companion before recording an outcome. Your draft is still here.");
+          const goal = p.store.getGoal(this.clock());
+          if (goal.id !== goalId || goal.needsCorrection) throw new InputError("Your goal changed. Close this dialog and review the current goal's checks.");
+          const previous = p.store.getQuestionOutcome(requestId);
+          if (previous) {
+            if (previous.goalId !== goalId || previous.questionId !== questionId || previous.note !== note || previous.resolution !== resolution || previous.basedOnRevision !== data.expectedRevision) throw new InputError("This save request was already used. Reopen Record outcome before changing the report.");
+            return { outcome: previous, repeated: true };
+          }
+          const question = p.store.getQuestion(questionId);
+          if (!question || question.goalId !== goalId || question.status !== "open" || question.revision !== data.expectedRevision) throw new InputError("This check changed or is no longer open. Close this dialog and review the current checks.");
+          const outcome: QuestionOutcome = { id: requestId, questionId, goalId, questionText: question.text, observationIds: question.observationIds, basedOnRevision: question.revision!, note, resolution, attribution: "user-reported", createdAt: this.clock() };
+          p.store.saveQuestionOutcome(outcome, outcome.createdAt);
+          p.invalidate();
+          const live = p.store.getLive();
+          if (live && (live.explanation.topic === "decision-brief" || live.explanation.topic === "interrupted-task" || live.explanation.evidence.some(ref => question.observationIds.includes(ref.observationId)))) p.store.setLive(null);
+          return { outcome, repeated: false };
+        });
+        return { ...this.status(), outcomeSaved: saved };
+      }
       case "dismiss": p.invalidate(); p.store.setLive(null); return this.status();
       case "export": return p.exportAll();
       case "delete": {

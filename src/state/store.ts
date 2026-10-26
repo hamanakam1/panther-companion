@@ -12,6 +12,7 @@ import type {
   InsightStatus,
   Observation,
   OpenQuestion,
+  QuestionOutcome,
   Preferences,
   Session,
   SurfaceCard,
@@ -90,11 +91,31 @@ CREATE INDEX IF NOT EXISTS idx_sig ON insight_signatures(signature);
 CREATE TABLE IF NOT EXISTS observation_goals (observation_id TEXT NOT NULL, goal_id TEXT NOT NULL, PRIMARY KEY (observation_id, goal_id));
 CREATE TABLE IF NOT EXISTS explanation_goals (explanation_id TEXT PRIMARY KEY, goal_id TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS insight_goals (insight_id TEXT PRIMARY KEY, goal_id TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS question_context (
+  question_id TEXT PRIMARY KEY REFERENCES questions(id) ON DELETE CASCADE,
+  goal_id TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  canonical_fingerprint TEXT,
+  reasoning_context TEXT,
+  revision INTEGER NOT NULL DEFAULT 0,
+  UNIQUE(goal_id, fingerprint)
+);
+CREATE TABLE IF NOT EXISTS question_outcomes (
+  id TEXT PRIMARY KEY,
+  question_id TEXT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+  goal_id TEXT NOT NULL,
+  based_on_revision INTEGER NOT NULL,
+  note TEXT NOT NULL,
+  resolution TEXT NOT NULL CHECK(resolution IN ('resolved', 'still-open')),
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_outcome_goal ON question_outcomes(goal_id, created_at);
 `;
 
 export class Store {
   private transactionActive = false;
   private closed = false;
+  private readonly hasOutcomeSchema: boolean;
   private constructor(private readonly db: DatabaseSync, readonly readOnly = false, private readonly writer?: WriterClaim) {
     this.db.exec("PRAGMA foreign_keys = ON;");
     this.db.exec("PRAGMA busy_timeout = 5000;");
@@ -103,7 +124,15 @@ export class Store {
     if (!readOnly) {
       this.db.exec("PRAGMA journal_mode = WAL;");
       this.db.exec(SCHEMA);
+      const columns = this.db.prepare("PRAGMA table_info(question_context)").all() as { name: string }[];
+      for (const name of ["canonical_fingerprint", "reasoning_context"]) {
+        if (!columns.some(column => column.name === name)) this.db.exec(`ALTER TABLE question_context ADD COLUMN ${name} TEXT`);
+      }
+      this.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_question_canonical ON question_context(goal_id, canonical_fingerprint)");
     }
+    // Older read-only stores remain readable. Migration creates tables only;
+    // historical questions are never assigned to a goal by inference.
+    this.hasOutcomeSchema = Boolean(this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'question_context'").get());
   }
 
   /**
@@ -400,31 +429,84 @@ export class Store {
   }
 
   insertQuestion(question: OpenQuestion): void {
-    const existing = this.listOpenQuestions().find((item) => item.text === question.text);
+    const goalId = question.goalId ?? this.getGoal(question.createdAt).id;
+    const fingerprint = JSON.stringify([question.text, [...new Set(question.observationIds)].sort()]);
+    const canonical = question.canonicalCheck;
+    const canonicalFingerprint = canonical?.observationIds.length && canonical.observationIds.every(id => question.observationIds.includes(id))
+      ? JSON.stringify([canonical.text, [...new Set(canonical.observationIds)].sort()]) : null;
+    // Resolution belongs to this goal and exact captured evidence. A different
+    // capture can ask the same check again; identical imports cannot reopen it.
+    const existing = this.db.prepare("SELECT question_id FROM question_context WHERE goal_id = ? AND (fingerprint = ? OR canonical_fingerprint = ?)").get(goalId, fingerprint, canonicalFingerprint);
     if (existing) return;
+    this.transaction(() => {
     this.db.prepare(`
       INSERT INTO questions (id, text, observation_ids, status, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(
       question.id,
       question.text,
-      JSON.stringify(question.observationIds),
+      JSON.stringify([...new Set(question.observationIds)].sort()),
       question.status,
       question.createdAt,
       question.updatedAt,
     );
+      this.db.prepare("INSERT INTO question_context (question_id, goal_id, fingerprint, canonical_fingerprint, reasoning_context, revision) VALUES (?, ?, ?, ?, ?, 0)").run(question.id, goalId, fingerprint, canonicalFingerprint, JSON.stringify([...new Set(question.contextObservationIds ?? question.observationIds)].sort()));
+    });
   }
 
   listOpenQuestions(): OpenQuestion[] {
-    const rows = this.db.prepare("SELECT * FROM questions WHERE status = 'open' ORDER BY created_at ASC").all();
+    const goalId = this.meta<Goal>("goal")?.id;
+    if (!this.hasOutcomeSchema || !goalId) return [];
+    const rows = this.db.prepare("SELECT q.*, c.goal_id, c.revision FROM questions q JOIN question_context c ON c.question_id = q.id WHERE q.status = 'open' AND c.goal_id = ? ORDER BY q.created_at ASC, q.id").all(goalId);
+    const outcomes = this.db.prepare("SELECT o.*, q.text AS question_text, q.observation_ids FROM question_outcomes o JOIN questions q ON q.id = o.question_id WHERE o.goal_id = ? AND o.rowid = (SELECT MAX(last.rowid) FROM question_outcomes last WHERE last.question_id = o.question_id)").all(goalId).flatMap(row => {
+      const outcome = rowToOutcome(asObject(row)); return outcome ? [outcome] : [];
+    });
     return rows.flatMap((row) => {
       const question = rowToQuestion(asObject(row));
-      return question ? [question] : [];
+      return question ? [{ ...question, latestOutcome: outcomes.find(outcome => outcome.questionId === question.id) }] : [];
     });
   }
 
   briefQuestions(now: string): void {
-    this.db.prepare("UPDATE questions SET status = 'briefed', updated_at = ? WHERE status = 'open'").run(now);
+    const goalId = this.meta<Goal>("goal")?.id;
+    if (goalId) this.db.prepare("UPDATE questions SET status = 'briefed', updated_at = ? WHERE status = 'open' AND id IN (SELECT question_id FROM question_context WHERE goal_id = ?)").run(now, goalId);
+  }
+
+  legacyQuestionCount(): number {
+    const row = this.db.prepare(this.hasOutcomeSchema
+      ? "SELECT COUNT(*) AS n FROM questions q LEFT JOIN question_context c ON c.question_id = q.id WHERE c.question_id IS NULL"
+      : "SELECT COUNT(*) AS n FROM questions").get() as { n: number };
+    return Number(row.n);
+  }
+
+  getQuestion(id: string): OpenQuestion | null {
+    if (!this.hasOutcomeSchema) return null;
+    return rowToQuestion(asObject(this.db.prepare("SELECT q.*, c.goal_id, c.revision FROM questions q JOIN question_context c ON c.question_id = q.id WHERE q.id = ?").get(id)));
+  }
+
+  getQuestionOutcome(id: string): QuestionOutcome | null {
+    if (!this.hasOutcomeSchema) return null;
+    return rowToOutcome(asObject(this.db.prepare("SELECT o.*, q.text AS question_text, q.observation_ids FROM question_outcomes o JOIN questions q ON q.id = o.question_id WHERE o.id = ?").get(id)));
+  }
+
+  resolvedOutcomeForCheck(goalId: string, check: string, observationIds: string[]): QuestionOutcome | null {
+    if (!this.hasOutcomeSchema) return null;
+    const fingerprint = JSON.stringify([check, [...new Set(observationIds)].sort()]);
+    const row = this.db.prepare("SELECT o.*, q.text AS question_text, q.observation_ids FROM question_context c JOIN questions q ON q.id = c.question_id JOIN question_outcomes o ON o.question_id = q.id WHERE c.goal_id = ? AND (c.fingerprint = ? OR c.canonical_fingerprint = ?) AND q.status = 'resolved' ORDER BY o.rowid DESC LIMIT 1").get(goalId, fingerprint, fingerprint);
+    return rowToOutcome(asObject(row));
+  }
+
+  listQuestionOutcomes(goalId = this.meta<Goal>("goal")?.id): QuestionOutcome[] {
+    if (!this.hasOutcomeSchema || !goalId) return [];
+    return this.db.prepare("SELECT o.*, q.text AS question_text, q.observation_ids FROM question_outcomes o JOIN questions q ON q.id = o.question_id WHERE o.goal_id = ? ORDER BY o.rowid DESC LIMIT 50").all(goalId).flatMap(row => {
+      const outcome = rowToOutcome(asObject(row)); return outcome ? [outcome] : [];
+    });
+  }
+
+  saveQuestionOutcome(outcome: QuestionOutcome, updatedAt: string): void {
+    this.db.prepare("INSERT INTO question_outcomes (id, question_id, goal_id, based_on_revision, note, resolution, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(outcome.id, outcome.questionId, outcome.goalId, outcome.basedOnRevision, outcome.note, outcome.resolution, outcome.createdAt);
+    this.db.prepare("UPDATE question_context SET revision = revision + 1 WHERE question_id = ?").run(outcome.questionId);
+    this.db.prepare("UPDATE questions SET status = ?, updated_at = ? WHERE id = ?").run(outcome.resolution === "resolved" ? "resolved" : "open", updatedAt, outcome.questionId);
   }
 
   insertFeedback(kind: FeedbackKind, insightId: string | null, topic: string | null, now: string): void {
@@ -496,6 +578,8 @@ export class Store {
       explanations: this.db.prepare("SELECT * FROM explanations").all(),
       insights: this.listInsights(),
       questions: this.db.prepare("SELECT * FROM questions").all(),
+      questionContext: this.hasOutcomeSchema ? this.db.prepare("SELECT * FROM question_context").all() : [],
+      questionOutcomes: this.hasOutcomeSchema ? this.db.prepare("SELECT *, 'user-reported' AS attribution FROM question_outcomes ORDER BY rowid").all() : [],
       feedback: this.db.prepare("SELECT * FROM feedback").all(),
       gateLog: this.listGateLogs(500),
       durableMemory: this.listDurable(),
@@ -508,6 +592,8 @@ export class Store {
         "durable_memory",
         "gate_log",
         "feedback",
+        "question_outcomes",
+        "question_context",
         "questions",
         "insight_signatures",
         "insights",
@@ -580,13 +666,19 @@ function rowToInsight(row: Record<string, unknown> | null): Insight | null {
 
 function rowToQuestion(row: Record<string, unknown> | null): OpenQuestion | null {
   if (!row) return null;
-  const status = row.status === "briefed" ? "briefed" : "open";
+  const status = row.status === "resolved" ? "resolved" : row.status === "briefed" ? "briefed" : "open";
   return {
     id: String(row.id),
     text: String(row.text),
     observationIds: JSON.parse(String(row.observation_ids)) as string[],
     status,
+    ...(typeof row.goal_id === "string" ? { goalId: row.goal_id, revision: Number(row.revision) } : {}),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };
+}
+
+function rowToOutcome(row: Record<string, unknown> | null): QuestionOutcome | null {
+  if (!row) return null;
+  return { id: String(row.id), questionId: String(row.question_id), goalId: String(row.goal_id), questionText: String(row.question_text), observationIds: JSON.parse(String(row.observation_ids)), basedOnRevision: Number(row.based_on_revision), note: String(row.note), resolution: row.resolution === "resolved" ? "resolved" : "still-open", attribution: "user-reported", createdAt: String(row.created_at) };
 }

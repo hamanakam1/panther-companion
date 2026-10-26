@@ -70,9 +70,27 @@ export type OpenQuestion = {
   id: string;
   text: string;
   observationIds: string[];
-  status: "open" | "briefed";
+  status: "open" | "briefed" | "resolved";
+  goalId?: string;
+  revision?: number;
+  latestOutcome?: QuestionOutcome;
+  canonicalCheck?: { text: string; observationIds: string[] };
+  contextObservationIds?: string[];
   createdAt: string;
   updatedAt: string;
+};
+
+export type QuestionOutcome = {
+  id: string;
+  questionId: string;
+  goalId: string;
+  questionText: string;
+  observationIds: string[];
+  basedOnRevision: number;
+  note: string;
+  resolution: "resolved" | "still-open";
+  attribution: "user-reported";
+  createdAt: string;
 };
 
 export type Preferences = {
