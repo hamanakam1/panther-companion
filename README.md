@@ -1,6 +1,41 @@
 # Panther Companion
 
+[![CI](https://github.com/hamanakam1/panther-companion/actions/workflows/ci.yml/badge.svg)](https://github.com/hamanakam1/panther-companion/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](package.json)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Node: >=22.13](https://img.shields.io/badge/node-%3E%3D22.13-brightgreen.svg)](package.json)
+[![Platform: Electron / Web](https://img.shields.io/badge/platform-Electron%20%7C%20Web-blueviolet.svg)](package.json)
+
 A quiet local workspace for understanding evidence in the context of your current goal. Attach selected text, a terminal result, or a review bundle from Panther Intent Capture. Companion keeps one useful explanation in view: **what it means, why it matters, your next check, and the evidence**.
+
+```mermaid
+flowchart LR
+    subgraph Inputs["Evidence Sources"]
+        PIC["<b>Panther Intent Capture</b><br/><i>review bundles</i>"]
+        CLI["<b>Terminal / JSONL logs</b><br/><i>execution events</i>"]
+        SEL["<b>Manual selection</b><br/><i>text & notes</i>"]
+    end
+
+    subgraph Companion["Panther Companion (Local Workspace)"]
+        direction TB
+        LOCK["<b>Single-Writer Lock</b><br/><i>SQLite state arbitration</i>"]
+        EXPL["<b>Goal-Aware Reasoner</b><br/><i>Meaning • Impact • Next Check • Evidence</i>"]
+        LOCK --> EXPL
+    end
+
+    subgraph Surfaces["Surfaces"]
+        DESK["<b>Desktop Panel</b><br/><i>700px Electron window</i>"]
+        BROW["<b>Web Browser</b><br/><i>http://127.0.0.1:8765</i>"]
+        MCP["<b>MCP Server</b><br/><i>Agent inspection</i>"]
+    end
+
+    PIC --> LOCK
+    CLI --> LOCK
+    SEL --> LOCK
+    EXPL --> DESK
+    EXPL --> BROW
+    EXPL --> MCP
+```
 
 The desktop app opens as a resizable 700 px panel on the right of the largest secondary display. The same interface works in a normal browser. Both work without Intent Capture, a model, a cloud account, or an always-on recorder.
 
